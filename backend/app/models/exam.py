@@ -1,7 +1,7 @@
 from __future__ import annotations
 import uuid
 import enum
-from sqlalchemy import Column, String, Date, DateTime, ForeignKey, Enum, Text, Integer
+from sqlalchemy import Column, String, Date, DateTime, ForeignKey, Enum, Text, Integer, Float
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -29,6 +29,48 @@ class PlusDisease(str, enum.Enum):
     NONE = "none"
     PRE_PLUS = "pre_plus"
     PLUS = "plus"
+
+
+class VFFixation(str, enum.Enum):
+    CENTRAL = "central"
+    ECCENTRIC = "eccentric"
+    NONE_UNABLE = "none_unable"
+
+
+class VFFollowing(str, enum.Enum):
+    FOLLOWS_SMOOTHLY = "follows_smoothly"
+    FOLLOWS_PARTIALLY = "follows_partially"
+    DOES_NOT_FOLLOW = "does_not_follow"
+    UNABLE_TO_ASSESS = "unable_to_assess"
+
+
+class VFCSM(str, enum.Enum):
+    CSM = "csm"
+    CS = "cs"
+    C = "c"
+    NOT_CENTRAL = "not_central"
+    UNABLE_TO_ASSESS = "unable_to_assess"
+
+
+class Nystagmus(str, enum.Enum):
+    ABSENT = "absent"
+    PENDULAR = "pendular"
+    JERK = "jerk"
+    LATENT = "latent"
+
+
+class Strabismus(str, enum.Enum):
+    ABSENT = "absent"
+    ESOTROPIA = "esotropia"
+    EXOTROPIA = "exotropia"
+    SUSPECTED = "suspected"
+
+
+class VFFunctionalImpression(str, enum.Enum):
+    AGE_APPROPRIATE = "age_appropriate"
+    MILDLY_DELAYED = "mildly_delayed"
+    SIGNIFICANTLY_DELAYED = "significantly_delayed"
+    UNABLE_TO_ASSESS = "unable_to_assess"
 
 
 class Exam(Base):
@@ -62,6 +104,22 @@ class Exam(Base):
 
     treatment_recommended = Column(String, nullable=True)  # laser / bevacizumab / surgery
     notes = Column(Text, nullable=True)
+
+    # Visual Function Assessment
+    vf_right_fixation = Column(Enum(VFFixation, name='vffixation'), nullable=True)
+    vf_right_following = Column(Enum(VFFollowing, name='vffollowing'), nullable=True)
+    vf_right_csm = Column(Enum(VFCSM, name='vfcsm'), nullable=True)
+    vf_right_teller_acuity = Column(Float, nullable=True)
+    vf_right_vep = Column(Float, nullable=True)
+    vf_left_fixation = Column(Enum(VFFixation, name='vffixation'), nullable=True)
+    vf_left_following = Column(Enum(VFFollowing, name='vffollowing'), nullable=True)
+    vf_left_csm = Column(Enum(VFCSM, name='vfcsm'), nullable=True)
+    vf_left_teller_acuity = Column(Float, nullable=True)
+    vf_left_vep = Column(Float, nullable=True)
+    vf_nystagmus = Column(Enum(Nystagmus, name='nystagmus'), nullable=True)
+    vf_strabismus = Column(Enum(Strabismus, name='strabismus'), nullable=True)
+    vf_functional_impression = Column(Enum(VFFunctionalImpression, name='vffunctionalimpression'), nullable=True)
+    vf_notes = Column(Text, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

@@ -39,6 +39,76 @@ const STAGE_LABELS = { no_rop: 'No ROP', stage_1: 'Stage 1', stage_2: 'Stage 2',
 const PLUS_LABELS  = { none: 'None', pre_plus: 'Pre-Plus', plus: 'Plus Disease' }
 const ROLE_LABELS  = { nicu_nurse: 'NICU Nurse', ophthalmologist: 'Ophthalmologist', hospital_coordinator: 'Hospital Coordinator', central_coordinator: 'Central Coordinator' }
 const TREATMENT_LABELS = { laser: 'Laser Photocoagulation', bevacizumab: 'Intravitreal Bevacizumab (IVB)', laser_and_bevacizumab: 'Laser + Bevacizumab', surgery: 'Vitreoretinal Surgery' }
+const VF_FIXATION_LABELS   = { central: 'Central', eccentric: 'Eccentric', none_unable: 'None / Unable' }
+const VF_FOLLOWING_LABELS  = { follows_smoothly: 'Follows smoothly', follows_partially: 'Follows partially', does_not_follow: 'Does not follow', unable_to_assess: 'Unable to assess' }
+const VF_CSM_LABELS        = { csm: 'CSM', cs: 'CS (not maintained)', c: 'C (not steady)', not_central: 'Not central (N)', unable_to_assess: 'Unable to assess' }
+const VF_NYSTAGMUS_LABELS  = { absent: 'Absent', pendular: 'Present — Pendular', jerk: 'Present — Jerk', latent: 'Present — Latent' }
+const VF_STRABISMUS_LABELS = { absent: 'Absent', esotropia: 'Esotropia', exotropia: 'Exotropia', suspected: 'Suspected (orthoptic review needed)' }
+const VF_IMPRESSION_LABELS = { age_appropriate: 'Age-appropriate visual function', mildly_delayed: 'Mildly delayed — monitor', significantly_delayed: 'Significantly delayed — refer for low vision', unable_to_assess: 'Unable to assess this visit' }
+
+function hasVFData(exam) {
+  return !!(exam.vf_right_fixation || exam.vf_left_fixation || exam.vf_right_following ||
+    exam.vf_left_following || exam.vf_nystagmus || exam.vf_strabismus || exam.vf_functional_impression)
+}
+
+function addVFSection(doc, exam, yStart) {
+  let y = yStart
+  y = sectionHeading(doc, y, 'Visual Function Assessment')
+
+  const rows = []
+  if (exam.vf_right_fixation || exam.vf_left_fixation)
+    rows.push(['Fixation', VF_FIXATION_LABELS[exam.vf_right_fixation] || '—', VF_FIXATION_LABELS[exam.vf_left_fixation] || '—'])
+  if (exam.vf_right_following || exam.vf_left_following)
+    rows.push(['Following', VF_FOLLOWING_LABELS[exam.vf_right_following] || '—', VF_FOLLOWING_LABELS[exam.vf_left_following] || '—'])
+  if (exam.vf_right_csm || exam.vf_left_csm)
+    rows.push(['CSM', VF_CSM_LABELS[exam.vf_right_csm] || '—', VF_CSM_LABELS[exam.vf_left_csm] || '—'])
+  if (exam.vf_right_teller_acuity != null || exam.vf_left_teller_acuity != null)
+    rows.push(['Teller Acuity (c/d)', exam.vf_right_teller_acuity != null ? String(exam.vf_right_teller_acuity) : '—', exam.vf_left_teller_acuity != null ? String(exam.vf_left_teller_acuity) : '—'])
+  if (exam.vf_right_vep != null || exam.vf_left_vep != null)
+    rows.push(['VEP (LogMAR)', exam.vf_right_vep != null ? String(exam.vf_right_vep) : '—', exam.vf_left_vep != null ? String(exam.vf_left_vep) : '—'])
+
+  if (rows.length > 0) {
+    autoTable(doc, {
+      startY: y,
+      margin: { left: ML, right: MR },
+      head: [['Finding', 'Right Eye (OD)', 'Left Eye (OS)']],
+      body: rows,
+      styles: { fontSize: 8.5, cellPadding: 2.5 },
+      headStyles: { fillColor: [204, 251, 241], textColor: [17, 94, 89], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: C.gray100 },
+      columnStyles: { 0: { fontStyle: 'bold', textColor: C.gray500, cellWidth: 45 } },
+    })
+    y = doc.lastAutoTable.finalY + 4
+  }
+
+  const binocular = []
+  if (exam.vf_nystagmus)  binocular.push(['Nystagmus', VF_NYSTAGMUS_LABELS[exam.vf_nystagmus]])
+  if (exam.vf_strabismus) binocular.push(['Strabismus', VF_STRABISMUS_LABELS[exam.vf_strabismus]])
+  if (exam.vf_functional_impression) binocular.push(['Overall Impression', VF_IMPRESSION_LABELS[exam.vf_functional_impression]])
+
+  if (binocular.length > 0) {
+    autoTable(doc, {
+      startY: y,
+      margin: { left: ML, right: MR },
+      body: binocular,
+      styles: { fontSize: 8.5, cellPadding: 2.5 },
+      alternateRowStyles: { fillColor: C.gray100 },
+      columnStyles: { 0: { fontStyle: 'bold', textColor: C.gray500, cellWidth: 55 } },
+    })
+    y = doc.lastAutoTable.finalY + 4
+  }
+
+  if (exam.vf_notes) {
+    setTxt(doc, C.gray700)
+    doc.setFont('helvetica', 'italic')
+    doc.setFontSize(8.5)
+    const lines = doc.splitTextToSize(exam.vf_notes, CW - 6)
+    doc.text(lines, ML + 3, y)
+    y += lines.length * 4.5 + 4
+  }
+
+  return y
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtDate(d) {
@@ -525,6 +595,10 @@ export async function generateSingleVisitPDF(baby, exam, hospitalName) {
     y += lines.length * 5 + 5
   }
 
+  if (hasVFData(exam)) {
+    y = addVFSection(doc, exam, y)
+  }
+
   // ── Signature block ──
   y = Math.max(y + 8, PH - 60)
   setDraw(doc, C.gray200)
@@ -658,6 +732,33 @@ export async function generateBabyFullPDF(baby, exams, hospitalName) {
     y += lines.length * 5 + 8
   }
 
+  // VF trajectory summary on cover
+  const vfExams = sortedExams.filter(hasVFData)
+  if (vfExams.length > 0) {
+    y = sectionHeading(doc, y, 'Visual Function Trajectory')
+    const vfRows = [...vfExams].reverse().map(e => [
+      fmtDate(e.exam_date),
+      VF_FIXATION_LABELS[e.vf_right_fixation] || '—',
+      VF_FOLLOWING_LABELS[e.vf_right_following] || '—',
+      VF_CSM_LABELS[e.vf_right_csm] || '—',
+      VF_FIXATION_LABELS[e.vf_left_fixation] || '—',
+      VF_FOLLOWING_LABELS[e.vf_left_following] || '—',
+      VF_CSM_LABELS[e.vf_left_csm] || '—',
+      VF_IMPRESSION_LABELS[e.vf_functional_impression] || '—',
+    ])
+    autoTable(doc, {
+      startY: y,
+      margin: { left: ML, right: MR },
+      head: [['Date', 'OD Fix', 'OD Follow', 'OD CSM', 'OS Fix', 'OS Follow', 'OS CSM', 'Impression']],
+      body: vfRows,
+      styles: { fontSize: 7.5, cellPadding: 2 },
+      headStyles: { fillColor: [204, 251, 241], textColor: [17, 94, 89], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: C.gray100 },
+      columnStyles: { 0: { cellWidth: 22 }, 7: { cellWidth: 38 } },
+    })
+    y = doc.lastAutoTable.finalY + 8
+  }
+
   // QR note
   if (qr) {
     setTxt(doc, C.gray500)
@@ -770,6 +871,10 @@ export async function generateBabyFullPDF(baby, exams, hospitalName) {
       const lines = doc.splitTextToSize(exam.notes, CW - 6)
       doc.text(lines, ML + 3, ey)
       ey += lines.length * 5 + 6
+    }
+
+    if (hasVFData(exam)) {
+      ey = addVFSection(doc, exam, ey)
     }
 
     // Signature block on each exam page

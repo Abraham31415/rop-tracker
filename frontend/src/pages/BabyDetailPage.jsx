@@ -31,6 +31,38 @@ const STATUS_STYLE = {
   pending:      { bg: 'var(--gray-100)', color: 'var(--gray-500)',  label: 'Pending' },
 }
 
+// VF labels
+const VF_FIXATION_LABELS = { central: 'Central', eccentric: 'Eccentric', none_unable: 'None/Unable' }
+const VF_FOLLOWING_LABELS = { follows_smoothly: 'Follows smoothly', follows_partially: 'Follows partially', does_not_follow: 'Does not follow', unable_to_assess: 'Unable' }
+const VF_CSM_LABELS = { csm: 'CSM', cs: 'CS', c: 'C', not_central: 'Not central', unable_to_assess: 'Unable' }
+const VF_NYSTAGMUS_LABELS = { absent: 'Absent', pendular: 'Pendular', jerk: 'Jerk', latent: 'Latent' }
+const VF_STRABISMUS_LABELS = { absent: 'Absent', esotropia: 'Esotropia', exotropia: 'Exotropia', suspected: 'Suspected' }
+const VF_IMPRESSION_LABELS = {
+  age_appropriate: 'Age-appropriate',
+  mildly_delayed: 'Mildly delayed — monitor',
+  significantly_delayed: 'Significantly delayed — refer',
+  unable_to_assess: 'Unable to assess',
+}
+
+function hasVFData(exam) {
+  return !!(exam.vf_right_fixation || exam.vf_left_fixation || exam.vf_right_following ||
+    exam.vf_left_following || exam.vf_right_csm || exam.vf_left_csm ||
+    exam.vf_nystagmus || exam.vf_strabismus || exam.vf_functional_impression)
+}
+
+function vfSummaryLine(exam) {
+  const parts = []
+  if (exam.vf_right_fixation || exam.vf_right_following) {
+    const od = [VF_FIXATION_LABELS[exam.vf_right_fixation], VF_FOLLOWING_LABELS[exam.vf_right_following]].filter(Boolean).join(', ')
+    if (od) parts.push(`OD: ${od}`)
+  }
+  if (exam.vf_left_fixation || exam.vf_left_following) {
+    const os = [VF_FIXATION_LABELS[exam.vf_left_fixation], VF_FOLLOWING_LABELS[exam.vf_left_following]].filter(Boolean).join(', ')
+    if (os) parts.push(`OS: ${os}`)
+  }
+  return parts.join(' | ')
+}
+
 // ── Severity of an exam finding ───────────────────────────────────────────────
 function examSeverity(exam) {
   const zone = exam.worst_zone || exam.right_zone || exam.left_zone
@@ -135,6 +167,11 @@ function ExamTimeline({ exams, baby, hospitalName }) {
                     Worst: {exam.worst_zone ? `${ZONE_LABELS[exam.worst_zone]} / ${STAGE_LABELS[exam.worst_stage] || '-'}` : 'No finding recorded'}
                     {exam.has_plus_disease === 'yes' && ' + Plus Disease'}
                   </div>
+                  {hasVFData(exam) && (
+                    <div style={{ fontSize: '.7rem', color: 'var(--teal-700)', marginTop: '.2rem', fontStyle: 'italic' }}>
+                      👁 {vfSummaryLine(exam) || 'Visual function recorded'}
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}>
                   <button
@@ -197,6 +234,31 @@ function ExamTimeline({ exams, baby, hospitalName }) {
                   {exam.postnatal_age_days && (
                     <div style={{ fontSize: '.75rem', color: 'var(--gray-400)' }}>
                       Postnatal age at exam: {exam.postnatal_age_days} days
+                    </div>
+                  )}
+
+                  {/* Visual function detail */}
+                  {hasVFData(exam) && (
+                    <div style={{ marginTop: '.5rem', padding: '.6rem .75rem', background: 'var(--teal-50)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--teal-200)' }}>
+                      <div style={{ fontSize: '.7rem', fontWeight: 700, color: 'var(--teal-700)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.4rem' }}>Visual Function</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.3rem .8rem', fontSize: '.75rem', color: 'var(--gray-700)' }}>
+                        {exam.vf_right_fixation && <div><span style={{ color: 'var(--gray-400)', fontWeight: 600 }}>OD Fix:</span> {VF_FIXATION_LABELS[exam.vf_right_fixation]}</div>}
+                        {exam.vf_left_fixation  && <div><span style={{ color: 'var(--gray-400)', fontWeight: 600 }}>OS Fix:</span> {VF_FIXATION_LABELS[exam.vf_left_fixation]}</div>}
+                        {exam.vf_right_following && <div><span style={{ color: 'var(--gray-400)', fontWeight: 600 }}>OD Follow:</span> {VF_FOLLOWING_LABELS[exam.vf_right_following]}</div>}
+                        {exam.vf_left_following  && <div><span style={{ color: 'var(--gray-400)', fontWeight: 600 }}>OS Follow:</span> {VF_FOLLOWING_LABELS[exam.vf_left_following]}</div>}
+                        {exam.vf_right_csm && <div><span style={{ color: 'var(--gray-400)', fontWeight: 600 }}>OD CSM:</span> {VF_CSM_LABELS[exam.vf_right_csm]}</div>}
+                        {exam.vf_left_csm  && <div><span style={{ color: 'var(--gray-400)', fontWeight: 600 }}>OS CSM:</span> {VF_CSM_LABELS[exam.vf_left_csm]}</div>}
+                        {exam.vf_nystagmus && <div><span style={{ color: 'var(--gray-400)', fontWeight: 600 }}>Nystagmus:</span> {VF_NYSTAGMUS_LABELS[exam.vf_nystagmus]}</div>}
+                        {exam.vf_strabismus && <div><span style={{ color: 'var(--gray-400)', fontWeight: 600 }}>Strabismus:</span> {VF_STRABISMUS_LABELS[exam.vf_strabismus]}</div>}
+                      </div>
+                      {exam.vf_functional_impression && (
+                        <div style={{ marginTop: '.35rem', fontSize: '.75rem', fontWeight: 600, color: 'var(--teal-700)' }}>
+                          Impression: {VF_IMPRESSION_LABELS[exam.vf_functional_impression]}
+                        </div>
+                      )}
+                      {exam.vf_notes && (
+                        <div style={{ marginTop: '.3rem', fontSize: '.73rem', color: 'var(--gray-600)', fontStyle: 'italic' }}>{exam.vf_notes}</div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -384,6 +446,97 @@ const REFERRAL_STATUS_COLORS = {
   arrived_treated: { bg: 'var(--green-100)', color: 'var(--green-700)' },
   did_not_arrive:  { bg: 'var(--red-100)', color: 'var(--red-700)' },
   unknown:         { bg: 'var(--gray-100)', color: 'var(--gray-500)' },
+}
+
+// ── Visual Function Tab ───────────────────────────────────────────────────────
+function VisualFunctionTab({ exams }) {
+  const vfExams = [...exams].filter(hasVFData).sort((a, b) => new Date(a.exam_date) - new Date(b.exam_date))
+
+  if (vfExams.length === 0) {
+    return (
+      <div className="card" style={{ textAlign: 'center', padding: '3rem 1rem' }}>
+        <div style={{ fontSize: '2rem', marginBottom: '.75rem' }}>👁</div>
+        <p style={{ color: 'var(--gray-500)', fontSize: '.9rem', fontWeight: 600 }}>No visual function data recorded yet.</p>
+        <p style={{ color: 'var(--gray-400)', fontSize: '.82rem', marginTop: '.3rem' }}>
+          When recording an exam, expand the "Visual Function Assessment" section to add data.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {/* Trajectory table */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: '1rem 1.375rem', borderBottom: '1px solid var(--gray-100)' }}>
+          <div style={{ fontSize: '.68rem', fontWeight: 700, color: 'var(--teal-600)', textTransform: 'uppercase', letterSpacing: '.09em', marginBottom: '.2rem' }}>
+            Visual Function Trajectory
+          </div>
+          <p style={{ fontSize: '.83rem', color: 'var(--gray-500)' }}>
+            {vfExams.length} exam{vfExams.length > 1 ? 's' : ''} with visual function data · chronological order
+          </p>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.78rem' }}>
+            <thead>
+              <tr style={{ background: 'var(--gray-50)', borderBottom: '1px solid var(--gray-200)' }}>
+                <th style={{ padding: '.6rem .9rem', textAlign: 'left', fontWeight: 700, color: 'var(--gray-500)', fontSize: '.7rem', textTransform: 'uppercase', letterSpacing: '.06em', whiteSpace: 'nowrap' }}>Date</th>
+                <th style={{ padding: '.6rem .9rem', textAlign: 'left', fontWeight: 700, color: '#2563eb', fontSize: '.7rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>OD Fix</th>
+                <th style={{ padding: '.6rem .9rem', textAlign: 'left', fontWeight: 700, color: '#2563eb', fontSize: '.7rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>OD Follow</th>
+                <th style={{ padding: '.6rem .9rem', textAlign: 'left', fontWeight: 700, color: '#2563eb', fontSize: '.7rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>OD CSM</th>
+                <th style={{ padding: '.6rem .9rem', textAlign: 'left', fontWeight: 700, color: '#16a34a', fontSize: '.7rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>OS Fix</th>
+                <th style={{ padding: '.6rem .9rem', textAlign: 'left', fontWeight: 700, color: '#16a34a', fontSize: '.7rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>OS Follow</th>
+                <th style={{ padding: '.6rem .9rem', textAlign: 'left', fontWeight: 700, color: '#16a34a', fontSize: '.7rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>OS CSM</th>
+                <th style={{ padding: '.6rem .9rem', textAlign: 'left', fontWeight: 700, color: 'var(--gray-500)', fontSize: '.7rem', textTransform: 'uppercase', letterSpacing: '.06em', whiteSpace: 'nowrap' }}>Impression</th>
+              </tr>
+            </thead>
+            <tbody>
+              {vfExams.map((exam, idx) => (
+                <tr key={exam.id} style={{ borderBottom: '1px solid var(--gray-100)', background: idx % 2 === 0 ? 'var(--white)' : 'var(--gray-50)' }}>
+                  <td style={{ padding: '.55rem .9rem', fontWeight: 700, color: 'var(--gray-800)', whiteSpace: 'nowrap' }}>
+                    {format(new Date(exam.exam_date + 'T00:00:00'), 'dd MMM yyyy')}
+                  </td>
+                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FIXATION_LABELS[exam.vf_right_fixation] || '—'}</td>
+                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FOLLOWING_LABELS[exam.vf_right_following] || '—'}</td>
+                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_CSM_LABELS[exam.vf_right_csm] || '—'}</td>
+                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FIXATION_LABELS[exam.vf_left_fixation] || '—'}</td>
+                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FOLLOWING_LABELS[exam.vf_left_following] || '—'}</td>
+                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_CSM_LABELS[exam.vf_left_csm] || '—'}</td>
+                  <td style={{ padding: '.55rem .9rem', color: 'var(--teal-700)', fontWeight: 600, fontSize: '.75rem' }}>
+                    {VF_IMPRESSION_LABELS[exam.vf_functional_impression] || '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Nystagmus / strabismus summary */}
+      {vfExams.some(e => e.vf_nystagmus || e.vf_strabismus) && (
+        <div className="card">
+          <div style={{ fontSize: '.68rem', fontWeight: 700, color: 'var(--teal-600)', textTransform: 'uppercase', letterSpacing: '.09em', marginBottom: '.75rem' }}>
+            Binocular Findings History
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+            {vfExams.filter(e => e.vf_nystagmus || e.vf_strabismus).map(exam => (
+              <div key={exam.id} style={{ display: 'flex', gap: '1rem', fontSize: '.82rem', padding: '.4rem 0', borderBottom: '1px solid var(--gray-100)', flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 700, color: 'var(--gray-700)', minWidth: 100 }}>
+                  {format(new Date(exam.exam_date + 'T00:00:00'), 'dd MMM yyyy')}
+                </span>
+                {exam.vf_nystagmus && (
+                  <span style={{ color: 'var(--gray-600)' }}>Nystagmus: <strong>{VF_NYSTAGMUS_LABELS[exam.vf_nystagmus]}</strong></span>
+                )}
+                {exam.vf_strabismus && (
+                  <span style={{ color: 'var(--gray-600)' }}>Strabismus: <strong>{VF_STRABISMUS_LABELS[exam.vf_strabismus]}</strong></span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ── Clinical Outcome section ──────────────────────────────────────────────────
@@ -681,6 +834,7 @@ export default function BabyDetailPage() {
   const { user } = useAuth()
   const [showCallPanel, setShowCallPanel] = useState(false)
   const [exportingFull, setExportingFull] = useState(false)
+  const [activeTab, setActiveTab] = useState('overview')
 
   const handleExportFull = async () => {
     setExportingFull(true)
@@ -786,8 +940,29 @@ export default function BabyDetailPage() {
         </div>
       )}
 
+      {/* ── Tabs ───────────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', gap: '.25rem', borderBottom: '2px solid var(--gray-200)', marginBottom: '1.25rem' }}>
+        {[
+          { id: 'overview', label: 'Overview' },
+          { id: 'vf', label: '👁 Visual Function' },
+        ].map(tab => (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
+            background: 'none', border: 'none', cursor: 'pointer', padding: '.55rem 1.1rem',
+            fontSize: '.87rem', fontWeight: 700,
+            color: activeTab === tab.id ? 'var(--teal-700)' : 'var(--gray-500)',
+            borderBottom: activeTab === tab.id ? '2px solid var(--teal-600)' : '2px solid transparent',
+            marginBottom: '-2px', transition: 'all .15s',
+          }}>{tab.label}</button>
+        ))}
+      </div>
+
+      {/* ── Visual Function Tab ─────────────────────────────────────────── */}
+      {activeTab === 'vf' && (
+        <VisualFunctionTab exams={exams} />
+      )}
+
       {/* ── Two-column layout ───────────────────────────────────────────── */}
-      <div className="profile-grid">
+      {activeTab === 'overview' && <div className="profile-grid">
 
         {/* LEFT: timeline + reminder log */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -925,7 +1100,7 @@ export default function BabyDetailPage() {
           )}
 
         </div>
-      </div>
+      </div>}
     </div>
   )
 }

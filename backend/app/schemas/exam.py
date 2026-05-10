@@ -3,7 +3,7 @@ from uuid import UUID
 from datetime import date, datetime
 from pydantic import BaseModel
 from typing import Optional
-from app.models.exam import Zone, Stage, PlusDisease
+from app.models.exam import Zone, Stage, PlusDisease, VFFixation, VFFollowing, VFCSM, Nystagmus, Strabismus, VFFunctionalImpression
 
 
 class ExamCreate(BaseModel):
@@ -22,6 +22,20 @@ class ExamCreate(BaseModel):
 
     treatment_recommended: Optional[str] = None
     notes: Optional[str] = None
+    vf_right_fixation: Optional[VFFixation] = None
+    vf_right_following: Optional[VFFollowing] = None
+    vf_right_csm: Optional[VFCSM] = None
+    vf_right_teller_acuity: Optional[float] = None
+    vf_right_vep: Optional[float] = None
+    vf_left_fixation: Optional[VFFixation] = None
+    vf_left_following: Optional[VFFollowing] = None
+    vf_left_csm: Optional[VFCSM] = None
+    vf_left_teller_acuity: Optional[float] = None
+    vf_left_vep: Optional[float] = None
+    vf_nystagmus: Optional[Nystagmus] = None
+    vf_strabismus: Optional[Strabismus] = None
+    vf_functional_impression: Optional[VFFunctionalImpression] = None
+    vf_notes: Optional[str] = None
 
 
 class ExamOut(BaseModel):
@@ -41,6 +55,20 @@ class ExamOut(BaseModel):
     next_exam_weeks: Optional[int]
     treatment_recommended: Optional[str]
     notes: Optional[str]
+    vf_right_fixation: Optional[VFFixation]
+    vf_right_following: Optional[VFFollowing]
+    vf_right_csm: Optional[VFCSM]
+    vf_right_teller_acuity: Optional[float]
+    vf_right_vep: Optional[float]
+    vf_left_fixation: Optional[VFFixation]
+    vf_left_following: Optional[VFFollowing]
+    vf_left_csm: Optional[VFCSM]
+    vf_left_teller_acuity: Optional[float]
+    vf_left_vep: Optional[float]
+    vf_nystagmus: Optional[Nystagmus]
+    vf_strabismus: Optional[Strabismus]
+    vf_functional_impression: Optional[VFFunctionalImpression]
+    vf_notes: Optional[str]
     created_at: datetime
 
     model_config = {"from_attributes": True}

@@ -32,9 +32,63 @@ def _migrate_enums() -> None:
                 conn.commit()
 
 
+def _migrate_visual_function() -> None:
+    """Create VF enum types and add VF columns to exams table if missing."""
+    from sqlalchemy import text
+    enum_types = {
+        'vffixation': ['central', 'eccentric', 'none_unable'],
+        'vffollowing': ['follows_smoothly', 'follows_partially', 'does_not_follow', 'unable_to_assess'],
+        'vfcsm': ['csm', 'cs', 'c', 'not_central', 'unable_to_assess'],
+        'nystagmus': ['absent', 'pendular', 'jerk', 'latent'],
+        'strabismus': ['absent', 'esotropia', 'exotropia', 'suspected'],
+        'vffunctionalimpression': ['age_appropriate', 'mildly_delayed', 'significantly_delayed', 'unable_to_assess'],
+    }
+    float_cols = [
+        'vf_right_teller_acuity', 'vf_right_vep',
+        'vf_left_teller_acuity', 'vf_left_vep',
+    ]
+    text_cols = ['vf_notes']
+    enum_cols = [
+        ('vf_right_fixation', 'vffixation'),
+        ('vf_right_following', 'vffollowing'),
+        ('vf_right_csm', 'vfcsm'),
+        ('vf_left_fixation', 'vffixation'),
+        ('vf_left_following', 'vffollowing'),
+        ('vf_left_csm', 'vfcsm'),
+        ('vf_nystagmus', 'nystagmus'),
+        ('vf_strabismus', 'strabismus'),
+        ('vf_functional_impression', 'vffunctionalimpression'),
+    ]
+    with engine.connect() as conn:
+        for type_name, values in enum_types.items():
+            exists = conn.execute(text(
+                "SELECT 1 FROM pg_type WHERE typname = :t"
+            ), {"t": type_name}).scalar()
+            if not exists:
+                vals_sql = ', '.join(f"'{v}'" for v in values)
+                conn.execute(text(f"CREATE TYPE {type_name} AS ENUM ({vals_sql})"))
+                conn.commit()
+        for col_name in float_cols + text_cols:
+            exists = conn.execute(text(
+                "SELECT 1 FROM information_schema.columns WHERE table_name='exams' AND column_name=:c"
+            ), {"c": col_name}).scalar()
+            if not exists:
+                sql_type = 'double precision' if col_name in float_cols else 'text'
+                conn.execute(text(f"ALTER TABLE exams ADD COLUMN {col_name} {sql_type}"))
+                conn.commit()
+        for col_name, type_name in enum_cols:
+            exists = conn.execute(text(
+                "SELECT 1 FROM information_schema.columns WHERE table_name='exams' AND column_name=:c"
+            ), {"c": col_name}).scalar()
+            if not exists:
+                conn.execute(text(f"ALTER TABLE exams ADD COLUMN {col_name} {type_name}"))
+                conn.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _migrate_enums()
+    _migrate_visual_function()
     start_scheduler()
     yield
     stop_scheduler()

@@ -405,31 +405,41 @@ def research_export(
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow([
+        # Baby-level (repeated per exam row)
         "study_id", "hospital", "enroll_year", "sex",
         "birth_weight_g", "gestational_age_weeks",
         "oxygen_therapy", "blood_transfusion", "sepsis", "inotropes", "anaemia",
-        "total_exams", "worst_stage", "worst_zone",
+        "total_exams", "final_status",
+        # Outcome summary (baby-level)
         "treatment_type", "treatment_eye", "treatment_date",
         "visual_outcome", "discharge_status", "discharge_date",
-        "final_status",
+        # Per-exam fields
+        "exam_number", "exam_date", "postnatal_age_days",
+        "right_zone", "right_stage", "right_plus",
+        "left_zone", "left_stage", "left_plus",
+        "worst_zone", "worst_stage", "has_plus_disease",
+        "treatment_recommended",
+        # Visual function per exam
+        "vf_right_fixation", "vf_right_following", "vf_right_csm",
+        "vf_right_teller_acuity", "vf_right_vep",
+        "vf_left_fixation", "vf_left_following", "vf_left_csm",
+        "vf_left_teller_acuity", "vf_left_vep",
+        "vf_nystagmus", "vf_strabismus",
+        "vf_functional_impression", "vf_notes",
     ])
+
+    def _ev(obj, attr):
+        v = getattr(obj, attr, None)
+        if v is None:
+            return ""
+        return v.value if hasattr(v, 'value') else v
 
     for idx, baby in enumerate(all_babies, start=1):
         study_id = f"ROP-{idx:04d}"
-        exams = exams_map.get(str(baby.id), [])
-        worst_stage = worst_zone = None
-        stage_order_vals = ["stage_5", "stage_4", "stage_3", "stage_2", "stage_1", "immature", "no_rop"]
-        for s in stage_order_vals:
-            if any(e.worst_stage == s for e in exams):
-                worst_stage = s
-                break
-        if worst_stage:
-            worst_zone = next(
-                (e.worst_zone for e in reversed(exams) if e.worst_stage == worst_stage), None
-            )
-
+        baby_exams = exams_map.get(str(baby.id), [])
         outcome = outcomes_map.get(str(baby.id))
-        writer.writerow([
+
+        base = [
             study_id,
             hospital_map.get(str(baby.hospital_id), ""),
             baby.enrolled_at.year if baby.enrolled_at else "",
@@ -441,17 +451,36 @@ def research_export(
             int(baby.sepsis or 0),
             int(baby.inotropes or 0),
             int(baby.anaemia or 0),
-            len(exams),
-            worst_stage or "",
-            worst_zone or "",
+            len(baby_exams),
+            baby.status.value if baby.status else "",
             outcome.treatment_type.value if outcome and outcome.treatment_type else "",
             outcome.treatment_eye.value if outcome and outcome.treatment_eye else "",
             outcome.treatment_date.isoformat() if outcome and outcome.treatment_date else "",
             outcome.visual_outcome.value if outcome and outcome.visual_outcome else "",
             outcome.discharge_status.value if outcome and outcome.discharge_status else "",
             outcome.discharge_date.isoformat() if outcome and outcome.discharge_date else "",
-            baby.status.value if baby.status else "",
-        ])
+        ]
+
+        if not baby_exams:
+            writer.writerow(base + [""] * 25)
+        else:
+            for enum_n, exam in enumerate(baby_exams, start=1):
+                writer.writerow(base + [
+                    enum_n,
+                    exam.exam_date.isoformat() if exam.exam_date else "",
+                    exam.postnatal_age_days or "",
+                    _ev(exam, 'right_zone'), _ev(exam, 'right_stage'), _ev(exam, 'right_plus'),
+                    _ev(exam, 'left_zone'), _ev(exam, 'left_stage'), _ev(exam, 'left_plus'),
+                    _ev(exam, 'worst_zone'), _ev(exam, 'worst_stage'),
+                    exam.has_plus_disease or "",
+                    exam.treatment_recommended or "",
+                    _ev(exam, 'vf_right_fixation'), _ev(exam, 'vf_right_following'), _ev(exam, 'vf_right_csm'),
+                    exam.vf_right_teller_acuity or "", exam.vf_right_vep or "",
+                    _ev(exam, 'vf_left_fixation'), _ev(exam, 'vf_left_following'), _ev(exam, 'vf_left_csm'),
+                    exam.vf_left_teller_acuity or "", exam.vf_left_vep or "",
+                    _ev(exam, 'vf_nystagmus'), _ev(exam, 'vf_strabismus'),
+                    _ev(exam, 'vf_functional_impression'), exam.vf_notes or "",
+                ])
 
     output.seek(0)
     filename = f"rop_research_export_{datetime.now().strftime('%Y%m%d')}.csv"
