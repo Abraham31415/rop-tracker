@@ -192,7 +192,7 @@ for u in users_data:
             email=u["email"],
             full_name=u["full_name"],
             hashed_password=hash_password(u["password"]),
-            role=u["role"],
+            role=u["role"].value,
             hospital_id=u["hospital_id"],
         )
         db.add(obj)
@@ -343,11 +343,13 @@ for b in babies_seed:
     appt_date  = b.pop("appt_date")
     appt_status = b.pop("appt_status")
 
-    baby = Baby(**b, hospital_id=hosp.id)
+    import enum as _enum
+    b_converted = {k: v.value if isinstance(v, _enum.Enum) else v for k, v in b.items()}
+    baby = Baby(**b_converted, hospital_id=hosp.id)
     db.add(baby)
     db.flush()
 
-    appt = Appointment(baby_id=baby.id, due_date=appt_date, status=appt_status)
+    appt = Appointment(baby_id=baby.id, due_date=appt_date, status=appt_status.value)
     db.add(appt)
     b_added += 1
 

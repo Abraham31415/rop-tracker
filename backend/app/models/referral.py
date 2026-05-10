@@ -33,9 +33,9 @@ class Referral(Base):
     to_hospital_id = Column(UUID(as_uuid=True), ForeignKey("hospitals.id"), nullable=True)
     to_external = Column(Boolean, default=False)  # True for 'External / abroad'
 
-    reason = Column(Enum(ReferralReason), nullable=False)
+    reason = Column(Enum(ReferralReason, values_callable=lambda x: [e.value for e in x]), nullable=False)
     referral_date = Column(Date, nullable=False)
-    status = Column(Enum(ReferralStatus), default=ReferralStatus.PENDING)
+    status = Column(Enum(ReferralStatus, values_callable=lambda x: [e.value for e in x]), default=ReferralStatus.PENDING)
     notes = Column(Text, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())

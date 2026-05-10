@@ -25,7 +25,7 @@ class Alert(Base):
     baby_id         = Column(UUID(as_uuid=True), ForeignKey("babies.id"),    nullable=False)
     appointment_id  = Column(UUID(as_uuid=True), ForeignKey("appointments.id"), nullable=True)
 
-    alert_type      = Column(Enum(AlertType), nullable=False, default=AlertType.LTFU_FLAGGED)
+    alert_type      = Column(Enum(AlertType, values_callable=lambda x: [e.value for e in x]), nullable=False, default=AlertType.LTFU_FLAGGED)
     title           = Column(String, nullable=False)
     body            = Column(Text, nullable=True)
 

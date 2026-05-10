@@ -41,7 +41,7 @@ class Baby(Base):
     # Identity
     full_name = Column(String, nullable=False)
     date_of_birth = Column(Date, nullable=False)
-    sex = Column(Enum(Sex), nullable=False)
+    sex = Column(Enum(Sex, values_callable=lambda x: [e.value for e in x]), nullable=False)
 
     # Birth metrics
     birth_weight_grams = Column(Float, nullable=False)
@@ -59,10 +59,10 @@ class Baby(Base):
     caregiver_name = Column(String, nullable=False)
     mtn_phone = Column(String, nullable=True)
     airtel_phone = Column(String, nullable=True)
-    language_preference = Column(Enum(Language), default=Language.ENGLISH)
+    language_preference = Column(Enum(Language, values_callable=lambda x: [e.value for e in x]), default=Language.ENGLISH)
 
     # Status
-    status = Column(Enum(BabyStatus), default=BabyStatus.ACTIVE)
+    status = Column(Enum(BabyStatus, values_callable=lambda x: [e.value for e in x]), default=BabyStatus.ACTIVE)
     notes = Column(Text, nullable=True)
 
     enrolled_at = Column(DateTime(timezone=True), server_default=func.now())

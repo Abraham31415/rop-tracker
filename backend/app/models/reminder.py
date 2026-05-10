@@ -38,14 +38,14 @@ class Reminder(Base):
     baby_id = Column(UUID(as_uuid=True), ForeignKey("babies.id"), nullable=False)
     appointment_id = Column(UUID(as_uuid=True), ForeignKey("appointments.id"), nullable=False)
 
-    reminder_type = Column(Enum(ReminderType), nullable=False)
-    trigger = Column(Enum(ReminderTrigger), nullable=False)
+    reminder_type = Column(Enum(ReminderType, values_callable=lambda x: [e.value for e in x]), nullable=False)
+    trigger = Column(Enum(ReminderTrigger, values_callable=lambda x: [e.value for e in x]), nullable=False)
     language = Column(String, nullable=False, default="english")
 
     recipient_phone = Column(String, nullable=True)
     message_body = Column(Text, nullable=True)
 
-    status = Column(Enum(ReminderStatus), default=ReminderStatus.PENDING)
+    status = Column(Enum(ReminderStatus, values_callable=lambda x: [e.value for e in x]), default=ReminderStatus.PENDING)
     provider_message_id = Column(String, nullable=True)  # Africa's Talking message ID
     error_message = Column(Text, nullable=True)
 

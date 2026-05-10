@@ -85,18 +85,18 @@ class Exam(Base):
     postmenstrual_age_weeks = Column(String, nullable=True)
 
     # Right eye
-    right_zone = Column(Enum(Zone), nullable=True)
-    right_stage = Column(Enum(Stage), nullable=True)
-    right_plus = Column(Enum(PlusDisease), default=PlusDisease.NONE)
+    right_zone = Column(Enum(Zone, values_callable=lambda x: [e.value for e in x]), nullable=True)
+    right_stage = Column(Enum(Stage, values_callable=lambda x: [e.value for e in x]), nullable=True)
+    right_plus = Column(Enum(PlusDisease, values_callable=lambda x: [e.value for e in x]), default=PlusDisease.NONE)
 
     # Left eye
-    left_zone = Column(Enum(Zone), nullable=True)
-    left_stage = Column(Enum(Stage), nullable=True)
-    left_plus = Column(Enum(PlusDisease), default=PlusDisease.NONE)
+    left_zone = Column(Enum(Zone, values_callable=lambda x: [e.value for e in x]), nullable=True)
+    left_stage = Column(Enum(Stage, values_callable=lambda x: [e.value for e in x]), nullable=True)
+    left_plus = Column(Enum(PlusDisease, values_callable=lambda x: [e.value for e in x]), default=PlusDisease.NONE)
 
     # Worst finding (used for scheduling — system auto-derives this)
-    worst_zone = Column(Enum(Zone), nullable=True)
-    worst_stage = Column(Enum(Stage), nullable=True)
+    worst_zone = Column(Enum(Zone, values_callable=lambda x: [e.value for e in x]), nullable=True)
+    worst_stage = Column(Enum(Stage, values_callable=lambda x: [e.value for e in x]), nullable=True)
     has_plus_disease = Column(String, nullable=True)  # "yes" / "no"
 
     # Next appointment interval auto-calculated from findings
@@ -106,19 +106,19 @@ class Exam(Base):
     notes = Column(Text, nullable=True)
 
     # Visual Function Assessment
-    vf_right_fixation = Column(Enum(VFFixation, name='vffixation'), nullable=True)
-    vf_right_following = Column(Enum(VFFollowing, name='vffollowing'), nullable=True)
-    vf_right_csm = Column(Enum(VFCSM, name='vfcsm'), nullable=True)
+    vf_right_fixation = Column(Enum(VFFixation, name='vffixation', values_callable=lambda x: [e.value for e in x]), nullable=True)
+    vf_right_following = Column(Enum(VFFollowing, name='vffollowing', values_callable=lambda x: [e.value for e in x]), nullable=True)
+    vf_right_csm = Column(Enum(VFCSM, name='vfcsm', values_callable=lambda x: [e.value for e in x]), nullable=True)
     vf_right_teller_acuity = Column(Float, nullable=True)
     vf_right_vep = Column(Float, nullable=True)
-    vf_left_fixation = Column(Enum(VFFixation, name='vffixation'), nullable=True)
-    vf_left_following = Column(Enum(VFFollowing, name='vffollowing'), nullable=True)
-    vf_left_csm = Column(Enum(VFCSM, name='vfcsm'), nullable=True)
+    vf_left_fixation = Column(Enum(VFFixation, name='vffixation', values_callable=lambda x: [e.value for e in x]), nullable=True)
+    vf_left_following = Column(Enum(VFFollowing, name='vffollowing', values_callable=lambda x: [e.value for e in x]), nullable=True)
+    vf_left_csm = Column(Enum(VFCSM, name='vfcsm', values_callable=lambda x: [e.value for e in x]), nullable=True)
     vf_left_teller_acuity = Column(Float, nullable=True)
     vf_left_vep = Column(Float, nullable=True)
-    vf_nystagmus = Column(Enum(Nystagmus, name='nystagmus'), nullable=True)
-    vf_strabismus = Column(Enum(Strabismus, name='strabismus'), nullable=True)
-    vf_functional_impression = Column(Enum(VFFunctionalImpression, name='vffunctionalimpression'), nullable=True)
+    vf_nystagmus = Column(Enum(Nystagmus, name='nystagmus', values_callable=lambda x: [e.value for e in x]), nullable=True)
+    vf_strabismus = Column(Enum(Strabismus, name='strabismus', values_callable=lambda x: [e.value for e in x]), nullable=True)
+    vf_functional_impression = Column(Enum(VFFunctionalImpression, name='vffunctionalimpression', values_callable=lambda x: [e.value for e in x]), nullable=True)
     vf_notes = Column(Text, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
