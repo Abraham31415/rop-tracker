@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem \"$env:APPDATA\\\\npm\" -ErrorAction SilentlyContinue | Select-Object -First 5)",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "PowerShell(python -c \"import json; print\\('Python json module: OK'\\)\" 2>&1)",
+      "PowerShell(node --version 2>&1)",
+      "PowerShell(npm --version 2>&1)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "Bash(/c/Users/HP/AppData/Local/Programs/Python/Python314/python.exe -c ' *)",
+      "Bash(which python3 *)",
+      "Bash(curl -s http://localhost:8000/api/hospitals/)",
+      "Bash(\"C:\\\\Program Files\\\\nodejs\\\\node.exe\" \"C:\\\\Program Files\\\\nodejs\\\\node_modules\\\\npm\\\\bin\\\\npm-cli.js\" install jspdf jspdf-autotable qrcode)",
+      "Bash(curl -s -X POST http://localhost:8000/api/auth/login -H 'Content-Type: application/json' -d '{\\\\\"email\\\\\":\\\\\"central@rop.ug\\\\\",\\\\\"password\\\\\":\\\\\"rop2024\\\\\"}')",
+      "Bash(curl -s \"http://localhost:8000/api/reports/population\" -H \"Authorization: Bearer $\\(curl -s -X POST http://localhost:8000/api/auth/login -H 'Content-Type: application/json' -d '{\\\\\"email\\\\\":\\\\\"central@rop.ug\\\\\",\\\\\"password\\\\\":\\\\\"rop2024\\\\\"}')",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('summary:', json.dumps\\(d['summary'], indent=2\\)\\); print\\('stages:', len\\(d['stage_breakdown']\\)\\); print\\('hospitals:', len\\(d['hospital_breakdown']\\)\\); print\\('monthly:', len\\(d['monthly_trend']\\)\\)\")",
+      "Bash(\"C:\\\\Program Files\\\\nodejs\\\\node.exe\" \"C:\\\\Program Files\\\\nodejs\\\\node_modules\\\\npm\\\\bin\\\\npm-cli.js\" run dev -- --host 0.0.0.0)",
+      "Bash(jobs)",
+      "Bash(\"C:\\\\Program Files\\\\nodejs\\\\node.exe\" \"./node_modules/vite/bin/vite.js\" --host 0.0.0.0)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:3000)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:5173)",
+      "Bash(pkill -f \"vite.js\")",
+      "Bash(\"C:\\\\Program Files\\\\nodejs\\\\node.exe\" \"C:\\\\Program Files\\\\nodejs\\\\node_modules\\\\npm\\\\bin\\\\npm-cli.js\" install canvg)"
+    ]
+  }
+}
