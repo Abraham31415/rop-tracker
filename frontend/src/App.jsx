@@ -1,6 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { AdminAuthProvider, useAdminAuth } from './contexts/AdminAuthContext'
 import AppShell from './components/AppShell'
+import AdminShell from './components/AdminShell'
 import ProtectedRoute from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
@@ -16,6 +18,10 @@ import SettingsPage from './pages/SettingsPage'
 import AppointmentsPage from './pages/AppointmentsPage'
 import NotFoundPage from './pages/NotFoundPage'
 import AnalyticsPage from './pages/AnalyticsPage'
+import AdminLoginPage from './pages/admin/AdminLoginPage'
+import AdminDashboardPage from './pages/admin/AdminDashboardPage'
+import AdminCoordinatorsPage from './pages/admin/AdminCoordinatorsPage'
+import AdminAuditPage from './pages/admin/AdminAuditPage'
 
 const COORDINATORS = ['hospital_coordinator', 'central_coordinator']
 const ENROLLERS    = ['nicu_nurse', 'ophthalmologist', 'hospital_coordinator', 'central_coordinator']
@@ -28,8 +34,15 @@ function PrivateRoute({ children }) {
   return children
 }
 
+function AdminRoute({ children }) {
+  const { isAuthenticated } = useAdminAuth()
+  if (!isAuthenticated) return <Navigate to="/admin/login" replace />
+  return children
+}
+
 export default function App() {
   return (
+    <AdminAuthProvider>
     <AuthProvider>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
@@ -80,8 +93,18 @@ export default function App() {
             <ProtectedRoute roles={['central_coordinator']}><AnalyticsPage /></ProtectedRoute>
           } />
         </Route>
+        {/* Admin panel — completely separate auth */}
+        <Route path="/admin/login" element={<AdminLoginPage />} />
+        <Route path="/admin" element={<AdminRoute><AdminShell /></AdminRoute>}>
+          <Route index element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="dashboard"    element={<AdminDashboardPage />} />
+          <Route path="coordinators" element={<AdminCoordinatorsPage />} />
+          <Route path="audit"        element={<AdminAuditPage />} />
+        </Route>
+
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </AuthProvider>
+    </AdminAuthProvider>
   )
 }
