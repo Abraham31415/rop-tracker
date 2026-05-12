@@ -118,6 +118,13 @@ export const activateUser = (id) => api.patch(`/api/users/${id}/activate`).then(
 export const getGatewayStatus = () => api.get('/api/reminders/gateway-status').then(r => r.data)
 export const sendTestSms = (phone) => api.post('/api/reminders/test-sms', null, { params: { phone } }).then(r => r.data)
 
+// ── Analytics (central coordinator) ──────────────────────────────────────────
+export const getScreeningVolume = (params) => api.get('/api/analytics/screening-volume', { params }).then(r => r.data)
+export const getLtfuRate        = (params) => api.get('/api/analytics/ltfu-rate', { params }).then(r => r.data)
+export const getAtRiskTrend     = (params) => api.get('/api/analytics/at-risk-trend', { params }).then(r => r.data)
+export const getAtRiskBabies    = ()       => api.get('/api/analytics/at-risk-babies').then(r => r.data)
+export const getLtfuBabies      = (params) => api.get('/api/analytics/ltfu-babies', { params }).then(r => r.data)
+
 // ── SMS Templates ─────────────────────────────────────────────────────────────
 export const getTemplates = () => api.get('/api/templates/').then(r => r.data)
 export const updateTemplate = (language, trigger, body) =>

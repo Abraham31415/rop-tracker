@@ -15,6 +15,7 @@ import ReportsPage from './pages/ReportsPage'
 import SettingsPage from './pages/SettingsPage'
 import AppointmentsPage from './pages/AppointmentsPage'
 import NotFoundPage from './pages/NotFoundPage'
+import AnalyticsPage from './pages/AnalyticsPage'
 
 const COORDINATORS = ['hospital_coordinator', 'central_coordinator']
 const ENROLLERS    = ['nicu_nurse', 'ophthalmologist', 'hospital_coordinator', 'central_coordinator']
@@ -72,6 +73,11 @@ export default function App() {
           {/* Network overview — central coordinator only */}
           <Route path="network" element={
             <ProtectedRoute roles={['central_coordinator']}><NetworkDashboardPage /></ProtectedRoute>
+          } />
+
+          {/* Analytics — central coordinator only */}
+          <Route path="analytics" element={
+            <ProtectedRoute roles={['central_coordinator']}><AnalyticsPage /></ProtectedRoute>
           } />
         </Route>
         <Route path="*" element={<NotFoundPage />} />

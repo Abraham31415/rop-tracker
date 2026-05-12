@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import app.models  # noqa: F401 — registers all ORM models with Base
 
-from app.routers import auth, babies, exams, hospitals, reminders, network, alerts, notifications, reports, users, templates, outcomes, referrals, appointments, contact_logs, screening_requests
+from app.routers import auth, babies, exams, hospitals, reminders, network, alerts, notifications, reports, users, templates, outcomes, referrals, appointments, contact_logs, screening_requests, analytics
 from app.services.scheduler import start_scheduler, stop_scheduler
 
 
@@ -63,6 +63,7 @@ app.include_router(referrals.router)
 app.include_router(appointments.router)
 app.include_router(contact_logs.router)
 app.include_router(screening_requests.router)
+app.include_router(analytics.router)
 
 
 @app.get("/api/health")
