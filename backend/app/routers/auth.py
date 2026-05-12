@@ -11,7 +11,14 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=UserOut)
-def register(data: UserCreate, db: Session = Depends(get_db)):
+def register(
+    data: UserCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.models.user import UserRole
+    if current_user.role not in (UserRole.HOSPITAL_COORDINATOR, UserRole.CENTRAL_COORDINATOR):
+        raise HTTPException(status_code=403, detail="Only coordinators can register new users")
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
     user = User(

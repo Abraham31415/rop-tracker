@@ -2,13 +2,21 @@ from __future__ import annotations
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 import app.models  # noqa: F401 — registers all ORM models with Base
 
 from app.routers import auth, babies, exams, hospitals, reminders, network, alerts, notifications, reports, users, templates, outcomes, referrals, appointments, contact_logs, screening_requests, analytics
 from app.services.scheduler import start_scheduler, stop_scheduler
+
+# Paths that do not require a JWT (login + health check only)
+_PUBLIC_PATHS = {"/api/auth/login", "/api/health"}
 
 
 def _run_migrations() -> None:
@@ -28,11 +36,33 @@ async def lifespan(app: FastAPI):
     stop_scheduler()
 
 
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
+
 app = FastAPI(
     title="ROP Tracker Uganda API",
     version="1.0.0",
     lifespan=lifespan,
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
+
+@app.middleware("http")
+async def require_auth(request: Request, call_next):
+    """Reject requests to protected API paths that carry no valid JWT."""
+    if request.url.path not in _PUBLIC_PATHS and request.url.path.startswith("/api/"):
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return JSONResponse({"detail": "Not authenticated"}, status_code=401)
+        from app.auth.jwt import decode_token
+        try:
+            decode_token(auth_header[7:])
+        except Exception:
+            return JSONResponse({"detail": "Invalid or expired token"}, status_code=401)
+    return await call_next(request)
+
 
 app.add_middleware(
     CORSMiddleware,
