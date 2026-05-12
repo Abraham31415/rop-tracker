@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { useQuery } from '@tanstack/react-query'
-import { enrollBaby, listHospitals } from '../services/api'
+import { enrollBaby, listHospitals, getMyHospitals } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 
 const LANGUAGES = [
@@ -14,11 +14,17 @@ const LANGUAGES = [
 ]
 
 const RISK_FACTORS = [
-  { name: 'oxygen_therapy',   label: 'Oxygen Therapy' },
-  { name: 'blood_transfusion', label: 'Blood Transfusion' },
-  { name: 'sepsis',           label: 'Sepsis' },
-  { name: 'inotropes',        label: 'Inotropes' },
-  { name: 'anaemia',          label: 'Anaemia' },
+  { name: 'oxygen_therapy',       label: 'Oxygen Therapy' },
+  { name: 'mechanical_ventilation', label: 'Mechanical Ventilation / CPAP' },
+  { name: 'blood_transfusion',    label: 'Blood Transfusion' },
+  { name: 'sepsis',               label: 'Sepsis' },
+  { name: 'inotropes',            label: 'Inotropes' },
+  { name: 'anaemia',              label: 'Anaemia' },
+  { name: 'surfactant_therapy',   label: 'Surfactant Therapy' },
+  { name: 'apnoea',               label: 'Apnoea' },
+  { name: 'nec',                  label: 'NEC' },
+  { name: 'twins_or_multiple',    label: 'Twins / Multiple Birth' },
+  { name: 'phototherapy',         label: 'Phototherapy' },
 ]
 
 function IconHospital() {
@@ -90,20 +96,28 @@ export default function EnrollBabyPage() {
   const { user } = useAuth()
   const [submitError, setSubmitError] = useState('')
   const [success, setSuccess] = useState(false)
-  const [checkedRisks, setCheckedRisks] = useState({
-    oxygen_therapy: false, blood_transfusion: false, sepsis: false, inotropes: false, anaemia: false,
-  })
+
+  const isOphthalm = user?.role === 'ophthalmologist'
 
   const { data: hospitals = [], isLoading: hospitalsLoading } = useQuery({
     queryKey: ['hospitals'],
     queryFn: listHospitals,
+    enabled: !isOphthalm,
   })
+  const { data: myHospitals, isLoading: myHospitalsLoading } = useQuery({
+    queryKey: ['my-hospitals'],
+    queryFn: getMyHospitals,
+    enabled: isOphthalm,
+  })
+  const hospitalsForDropdown = isOphthalm ? null : hospitals  // ophthalmologists use sectioned dropdown
 
-  const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm({
     defaultValues: {
       hospital_id: '',
       sex: 'male', language_preference: 'english',
       oxygen_therapy: false, blood_transfusion: false, sepsis: false, inotropes: false, anaemia: false,
+      mechanical_ventilation: false, surfactant_therapy: false, apnoea: false,
+      nec: false, twins_or_multiple: false, phototherapy: false,
     },
   })
 
@@ -113,12 +127,6 @@ export default function EnrollBabyPage() {
       setValue('hospital_id', user.hospital_id)
     }
   }, [hospitals, user, setValue])
-
-  const toggleRisk = name => {
-    const next = !checkedRisks[name]
-    setCheckedRisks(prev => ({ ...prev, [name]: next }))
-    setValue(name, next)
-  }
 
   const onSubmit = async data => {
     setSubmitError('')
@@ -158,17 +166,42 @@ export default function EnrollBabyPage() {
         <FormSection icon={<IconHospital />} iconColor="teal" title="Hospital / Facility" sub="Select the facility where this baby is being enrolled">
           <div className="form-group">
             <label>Hospital / Facility *</label>
-            <select
-              {...register('hospital_id', { required: 'Hospital is required' })}
-              disabled={hospitalsLoading}
-            >
-              <option value="">
-                {hospitalsLoading ? 'Loading hospitals…' : '-- Select a hospital --'}
-              </option>
-              {hospitals.map(h => (
-                <option key={h.id} value={h.id}>{h.name}{h.district ? ` (${h.district})` : ''}</option>
-              ))}
-            </select>
+            {isOphthalm ? (
+              <select
+                {...register('hospital_id', { required: 'Hospital is required' })}
+                disabled={myHospitalsLoading}
+              >
+                <option value="">
+                  {myHospitalsLoading ? 'Loading hospitals…' : '-- Select a hospital --'}
+                </option>
+                {myHospitals?.recent?.length > 0 && (
+                  <optgroup label="Recent">
+                    {myHospitals.recent.map(h => (
+                      <option key={h.id} value={h.id}>{h.name}{h.district ? ` (${h.district})` : ''}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {myHospitals?.all?.length > 0 && (
+                  <optgroup label="All Hospitals">
+                    {myHospitals.all.map(h => (
+                      <option key={h.id} value={h.id}>{h.name}{h.district ? ` (${h.district})` : ''}</option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            ) : (
+              <select
+                {...register('hospital_id', { required: 'Hospital is required' })}
+                disabled={hospitalsLoading}
+              >
+                <option value="">
+                  {hospitalsLoading ? 'Loading hospitals…' : '-- Select a hospital --'}
+                </option>
+                {hospitals.map(h => (
+                  <option key={h.id} value={h.id}>{h.name}{h.district ? ` (${h.district})` : ''}</option>
+                ))}
+              </select>
+            )}
             {errors.hospital_id && <span className="error-msg">{errors.hospital_id.message}</span>}
           </div>
         </FormSection>
@@ -232,21 +265,20 @@ export default function EnrollBabyPage() {
 
         <FormSection icon={<IconAlert />} iconColor="amber" title="Risk Factors" sub="Check all that apply during NICU stay">
           <div className="checkbox-group">
-            {RISK_FACTORS.map(rf => (
-              <label
-                key={rf.name}
-                className={`risk-chip${checkedRisks[rf.name] ? ' active' : ''}`}
-                onClick={() => toggleRisk(rf.name)}
-              >
-                <input type="checkbox" {...register(rf.name)} style={{ display: 'none' }} />
-                {checkedRisks[rf.name] && (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{ width: 12, height: 12, flexShrink: 0 }}>
-                    <polyline points="20 6 9 17 4 12"/>
-                  </svg>
-                )}
-                {rf.label}
-              </label>
-            ))}
+            {RISK_FACTORS.map(rf => {
+              const checked = !!watch(rf.name)
+              return (
+                <label key={rf.name} className={`risk-chip${checked ? ' active' : ''}`}>
+                  <input type="checkbox" {...register(rf.name)} style={{ display: 'none' }} />
+                  {checked && (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{ width: 12, height: 12, flexShrink: 0 }}>
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  )}
+                  {rf.label}
+                </label>
+              )
+            })}
           </div>
         </FormSection>
 

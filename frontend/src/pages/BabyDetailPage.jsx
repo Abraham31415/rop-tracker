@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getBaby, listExams, listReminders, logPhoneCall, listHospitals, getOutcome, upsertOutcome, listReferrals, createReferral, updateReferralStatus, listAppointments, markAppointmentAttended, updateBaby } from '../services/api'
+import { getBaby, listExams, listReminders, logPhoneCall, listHospitals, getOutcome, upsertOutcome, listReferrals, createReferral, updateReferralStatus, updateBaby, getContactLogs, addContactNote, updateDilation, dischargeBaby, reactivateBaby } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { format, formatDistanceToNow } from 'date-fns'
 import { generateBabyFullPDF, generateSingleVisitPDF } from '../services/pdfExport'
@@ -39,8 +39,8 @@ const VF_NYSTAGMUS_LABELS = { absent: 'Absent', pendular: 'Pendular', jerk: 'Jer
 const VF_STRABISMUS_LABELS = { absent: 'Absent', esotropia: 'Esotropia', exotropia: 'Exotropia', suspected: 'Suspected' }
 const VF_IMPRESSION_LABELS = {
   age_appropriate: 'Age-appropriate',
-  mildly_delayed: 'Mildly delayed (monitor)',
-  significantly_delayed: 'Significantly delayed (refer)',
+  mildly_delayed: 'Mildly delayed - monitor',
+  significantly_delayed: 'Significantly delayed - refer',
   unable_to_assess: 'Unable to assess',
 }
 
@@ -271,67 +271,6 @@ function ExamTimeline({ exams, baby, hospitalName }) {
   )
 }
 
-// ── Reminder log ──────────────────────────────────────────────────────────────
-function ReminderLog({ reminders }) {
-  const [showMsg, setShowMsg] = useState({})
-  if (!reminders.length) {
-    return (
-      <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--gray-400)', fontSize: '.875rem' }}>
-        No reminders sent yet.
-      </div>
-    )
-  }
-
-  return (
-    <div>
-      {reminders.map(r => {
-        const meta = TRIGGER_META[r.trigger] || { label: r.trigger, icon: '?', cls: 'sms' }
-        const st   = STATUS_STYLE[r.status]  || STATUS_STYLE.pending
-        const when = r.sent_at || r.created_at
-        return (
-          <div key={r.id} className="reminder-row">
-            <div className={`reminder-icon ${meta.cls}`} style={{ fontSize: '1rem' }}>
-              {meta.icon}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.2rem' }}>
-                <span style={{ fontWeight: 700, fontSize: '.85rem', color: 'var(--gray-800)' }}>{meta.label}</span>
-                <span style={{ padding: '.1rem .5rem', borderRadius: 999, fontSize: '.7rem', fontWeight: 700, background: st.bg, color: st.color }}>{st.label}</span>
-                {r.reminder_type === 'sms' && r.recipient_phone && (
-                  <span style={{ fontSize: '.72rem', color: 'var(--gray-400)', fontFamily: 'var(--font-mono)' }}>{r.recipient_phone}</span>
-                )}
-              </div>
-              <div style={{ fontSize: '.75rem', color: 'var(--gray-400)' }}>
-                {when ? `${format(new Date(when), 'dd MMM yyyy, HH:mm')} · ${formatDistanceToNow(new Date(when), { addSuffix: true })}` : '-'}
-              </div>
-              {r.message_body && (
-                <>
-                  {showMsg[r.id] && (
-                    <div style={{ marginTop: '.4rem', fontSize: '.78rem', color: 'var(--gray-600)', lineHeight: 1.6, padding: '.5rem .6rem', background: 'var(--gray-50)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--gray-200)' }}>
-                      {r.message_body}
-                    </div>
-                  )}
-                  <button
-                    onClick={() => setShowMsg(p => ({ ...p, [r.id]: !p[r.id] }))}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '.72rem', color: 'var(--teal-600)', fontWeight: 600, padding: '.2rem 0', marginTop: '.15rem' }}
-                  >
-                    {showMsg[r.id] ? 'Hide message ▲' : 'Show message ▼'}
-                  </button>
-                </>
-              )}
-              {r.error_message && (
-                <div style={{ fontSize: '.72rem', color: 'var(--red-600)', marginTop: '.2rem' }}>
-                  Error: {r.error_message}
-                </div>
-              )}
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
 // ── Phone call log form ───────────────────────────────────────────────────────
 function CallLogPanel({ babyId, onClose, onSaved }) {
   const [outcome, setOutcome] = useState('not_reached')
@@ -421,8 +360,8 @@ const VISUAL_OUTCOME_LABELS = {
   ltfu_before_outcome: 'LTFU Before Assessment',
 }
 const DISCHARGE_STATUS_LABELS = {
-  completed_no_rop: 'Completed: No ROP',
-  completed_treated: 'Completed: Treated Successfully',
+  completed_no_rop: 'Completed - No ROP',
+  completed_treated: 'Completed - Treated Successfully',
   referred_national: 'Referred Nationally',
   referred_abroad: 'Referred Abroad',
   died: 'Died',
@@ -496,14 +435,14 @@ function VisualFunctionTab({ exams }) {
                   <td style={{ padding: '.55rem .9rem', fontWeight: 700, color: 'var(--gray-800)', whiteSpace: 'nowrap' }}>
                     {format(new Date(exam.exam_date + 'T00:00:00'), 'dd MMM yyyy')}
                   </td>
-                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FIXATION_LABELS[exam.vf_right_fixation] || '-'}</td>
-                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FOLLOWING_LABELS[exam.vf_right_following] || '-'}</td>
-                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_CSM_LABELS[exam.vf_right_csm] || '-'}</td>
-                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FIXATION_LABELS[exam.vf_left_fixation] || '-'}</td>
-                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FOLLOWING_LABELS[exam.vf_left_following] || '-'}</td>
-                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_CSM_LABELS[exam.vf_left_csm] || '-'}</td>
+                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FIXATION_LABELS[exam.vf_right_fixation] || '—'}</td>
+                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FOLLOWING_LABELS[exam.vf_right_following] || '—'}</td>
+                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_CSM_LABELS[exam.vf_right_csm] || '—'}</td>
+                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FIXATION_LABELS[exam.vf_left_fixation] || '—'}</td>
+                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FOLLOWING_LABELS[exam.vf_left_following] || '—'}</td>
+                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_CSM_LABELS[exam.vf_left_csm] || '—'}</td>
                   <td style={{ padding: '.55rem .9rem', color: 'var(--teal-700)', fontWeight: 600, fontSize: '.75rem' }}>
-                    {VF_IMPRESSION_LABELS[exam.vf_functional_impression] || '-'}
+                    {VF_IMPRESSION_LABELS[exam.vf_functional_impression] || '—'}
                   </td>
                 </tr>
               ))}
@@ -592,7 +531,7 @@ function OutcomeSection({ babyId, canEdit }) {
           <div className="form-group">
             <label className="form-label">Treatment Type</label>
             <select className="form-control" {...field('treatment_type')}>
-              <option value="">Select...</option>
+              <option value="">— select —</option>
               {Object.entries(TREATMENT_TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </div>
@@ -600,7 +539,7 @@ function OutcomeSection({ babyId, canEdit }) {
             <div className="form-group">
               <label className="form-label">Eye Treated</label>
               <select className="form-control" {...field('treatment_eye')}>
-                <option value="">Select...</option>
+                <option value="">— select —</option>
                 {Object.entries(TREATMENT_EYE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
@@ -612,7 +551,7 @@ function OutcomeSection({ babyId, canEdit }) {
           <div className="form-group">
             <label className="form-label">Treatment Hospital</label>
             <select className="form-control" {...field('treatment_hospital_id')}>
-              <option value="">Same hospital</option>
+              <option value="">— same hospital —</option>
               {hospitals.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
             </select>
           </div>
@@ -624,14 +563,14 @@ function OutcomeSection({ babyId, canEdit }) {
             <div className="form-group">
               <label className="form-label">Visual Outcome</label>
               <select className="form-control" {...field('visual_outcome')}>
-                <option value="">Select...</option>
+                <option value="">— select —</option>
                 {Object.entries(VISUAL_OUTCOME_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
             <div className="form-group">
               <label className="form-label">Discharge Status</label>
               <select className="form-control" {...field('discharge_status')}>
-                <option value="">Select...</option>
+                <option value="">— select —</option>
                 {Object.entries(DISCHARGE_STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
@@ -672,17 +611,17 @@ function OutcomeSection({ babyId, canEdit }) {
       </div>
       {outcome ? (
         <>
-          <InfoRow label="Treatment" value={TREATMENT_TYPE_LABELS[outcome.treatment_type] || '-'} />
+          <InfoRow label="Treatment" value={TREATMENT_TYPE_LABELS[outcome.treatment_type] || '—'} />
           {outcome.treatment_type && outcome.treatment_type !== 'none' && (
             <>
-              <InfoRow label="Eye" value={TREATMENT_EYE_LABELS[outcome.treatment_eye] || '-'} />
-              <InfoRow label="Treat. Date" value={outcome.treatment_date ? format(new Date(outcome.treatment_date + 'T00:00:00'), 'dd MMM yyyy') : '-'} />
+              <InfoRow label="Eye" value={TREATMENT_EYE_LABELS[outcome.treatment_eye] || '—'} />
+              <InfoRow label="Treat. Date" value={outcome.treatment_date ? format(new Date(outcome.treatment_date + 'T00:00:00'), 'dd MMM yyyy') : '—'} />
               {outcome.treatment_hospital_name && <InfoRow label="Treat. Hospital" value={outcome.treatment_hospital_name} />}
               {outcome.treating_ophthalmologist && <InfoRow label="Ophthalmologist" value={outcome.treating_ophthalmologist} />}
             </>
           )}
-          <InfoRow label="Visual Outcome" value={VISUAL_OUTCOME_LABELS[outcome.visual_outcome] || '-'} />
-          <InfoRow label="Discharge" value={DISCHARGE_STATUS_LABELS[outcome.discharge_status] || '-'} />
+          <InfoRow label="Visual Outcome" value={VISUAL_OUTCOME_LABELS[outcome.visual_outcome] || '—'} />
+          <InfoRow label="Discharge" value={DISCHARGE_STATUS_LABELS[outcome.discharge_status] || '—'} />
           {outcome.discharge_date && <InfoRow label="Discharge Date" value={format(new Date(outcome.discharge_date + 'T00:00:00'), 'dd MMM yyyy')} />}
           {outcome.notes && (
             <p style={{ fontSize: '.82rem', color: 'var(--gray-600)', marginTop: '.5rem', lineHeight: 1.6 }}>{outcome.notes}</p>
@@ -754,7 +693,7 @@ function ReferralSection({ babyId, babyHospitalId, canEdit }) {
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Referring To</label>
               <select className="form-control" value={form.to_hospital_id} onChange={e => setForm(p => ({ ...p, to_hospital_id: e.target.value }))}>
-                <option value="">Select hospital</option>
+                <option value="">— select hospital —</option>
                 {hospitals.filter(h => h.id !== babyHospitalId).map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
               </select>
             </div>
@@ -827,8 +766,8 @@ function ReferralSection({ babyId, babyHospitalId, canEdit }) {
   )
 }
 
-// ── Caregiver & Contact edit card ────────────────────────────────────────────
-function CaregiverCard({ baby }) {
+// ── Caregiver & Contact edit card ─────────────────────────────────────────────
+function CaregiverCard({ baby, canEdit }) {
   const qc = useQueryClient()
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState(null)
@@ -848,6 +787,7 @@ function CaregiverCard({ baby }) {
     mutationFn: (data) => updateBaby(baby.id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['baby', String(baby.id)] })
+      qc.invalidateQueries({ queryKey: ['contact-logs', String(baby.id)] })
       setEditing(false)
     },
   })
@@ -861,7 +801,6 @@ function CaregiverCard({ baby }) {
   }
 
   const f = (k) => ({ value: form[k], onChange: e => setForm(p => ({ ...p, [k]: e.target.value })) })
-
   const phone = baby.mtn_phone || baby.airtel_phone
 
   if (editing && form) {
@@ -919,9 +858,11 @@ function CaregiverCard({ baby }) {
     <div className="card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '.75rem' }}>
         <SectionHeading>Caregiver &amp; Contact</SectionHeading>
-        <button className="btn btn-secondary btn-sm" style={{ marginTop: '-.15rem' }} onClick={startEdit}>
-          Edit
-        </button>
+        {canEdit && (
+          <button className="btn btn-secondary btn-sm" style={{ marginTop: '-.15rem' }} onClick={startEdit}>
+            Edit
+          </button>
+        )}
       </div>
       <InfoRow label="Name"     value={baby.caregiver_name} />
       <InfoRow label="MTN"      value={baby.mtn_phone} />
@@ -952,51 +893,86 @@ function CaregiverCard({ baby }) {
   )
 }
 
-// ── Attend confirmation dialog ────────────────────────────────────────────────
-function AttendDialog({ appointment, babyName, onConfirm, onCancel, isPending }) {
+// ── Discharge modal ───────────────────────────────────────────────────────────
+const DISCHARGE_REASONS = [
+  { value: 'completed_no_rop',  label: 'Completed - no ROP detected' },
+  { value: 'completed_treated', label: 'Completed - treated successfully' },
+  { value: 'referred_national', label: 'Referred to national centre' },
+  { value: 'referred_abroad',   label: 'Referred abroad' },
+  { value: 'died',              label: 'Died' },
+  { value: 'lost',              label: 'Lost to follow-up' },
+]
+
+function DischargeModal({ babyId, babyName, onClose, onDischarged }) {
+  const [reason, setReason] = useState('')
   const [notes, setNotes] = useState('')
-  const dueLabel = format(new Date(appointment.due_date + 'T00:00:00'), 'dd MMMM yyyy')
+
+  const mutation = useMutation({
+    mutationFn: () => dischargeBaby(babyId, reason, notes || undefined),
+    onSuccess: (updated) => { onDischarged(updated) },
+  })
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 1000,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,0.35)',
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)',
+      zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center',
       padding: '1rem',
     }}>
       <div style={{
-        background: 'var(--white)', borderRadius: 'var(--radius)', boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-        padding: '1.5rem', maxWidth: 420, width: '100%',
+        background: 'var(--white)', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-xl)',
+        width: '100%', maxWidth: 460, padding: '1.5rem',
       }}>
-        <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--gray-900)', marginBottom: '.5rem' }}>
-          Confirm Attendance
-        </div>
-        <p style={{ fontSize: '.9rem', color: 'var(--gray-700)', marginBottom: '1rem', lineHeight: 1.5 }}>
-          Confirm attendance for <strong>{babyName}</strong> on <strong>{dueLabel}</strong>?
+        <h3 style={{ margin: '0 0 .25rem', fontSize: '1.1rem', fontWeight: 700, color: 'var(--gray-900)' }}>
+          Discharge {babyName}
+        </h3>
+        <p style={{ margin: '0 0 1.25rem', fontSize: '.85rem', color: 'var(--gray-500)' }}>
+          This will stop all future SMS reminders and mark the baby as discharged.
+          You can reactivate later if needed.
         </p>
-        <div className="form-group" style={{ marginBottom: '1rem' }}>
-          <label className="form-label" style={{ marginBottom: '.3rem' }}>
-            Notes <span style={{ fontWeight: 400, color: 'var(--gray-400)' }}>(optional)</span>
-          </label>
+
+        <div className="form-group" style={{ marginBottom: '.85rem' }}>
+          <label className="form-label">Reason for discharge *</label>
+          <select
+            className="form-control"
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+          >
+            <option value="">-- Select a reason --</option>
+            {DISCHARGE_REASONS.map(r => (
+              <option key={r.value} value={r.value}>{r.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+          <label className="form-label">Notes (optional)</label>
           <textarea
+            className="form-control"
             rows={2}
+            style={{ resize: 'vertical', fontSize: '.85rem' }}
+            placeholder="Any additional context..."
             value={notes}
             onChange={e => setNotes(e.target.value)}
-            placeholder="e.g. Caregiver arrived late, rescheduled next visit…"
-            style={{ resize: 'vertical', fontSize: '.85rem', width: '100%' }}
-            className="form-control"
           />
         </div>
+
+        {mutation.isError && (
+          <div className="alert alert-error" style={{ marginBottom: '.75rem', padding: '.5rem .75rem', fontSize: '.82rem' }}>
+            {mutation.error?.response?.data?.detail || 'Failed to discharge baby.'}
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: '.6rem', justifyContent: 'flex-end' }}>
-          <button className="btn btn-secondary btn-sm" onClick={onCancel} disabled={isPending}>
+          <button className="btn btn-secondary" onClick={onClose} disabled={mutation.isPending}>
             Cancel
           </button>
           <button
-            className="btn btn-primary btn-sm"
-            onClick={() => onConfirm(notes)}
-            disabled={isPending}
+            className="btn btn-primary"
+            style={{ background: 'var(--red-600,#dc2626)', borderColor: 'var(--red-600,#dc2626)' }}
+            disabled={!reason || mutation.isPending}
+            onClick={() => mutation.mutate()}
           >
-            {isPending ? 'Saving…' : 'Confirm'}
+            {mutation.isPending ? 'Discharging…' : 'Confirm Discharge'}
           </button>
         </div>
       </div>
@@ -1004,132 +980,233 @@ function AttendDialog({ appointment, babyName, onConfirm, onCancel, isPending })
   )
 }
 
-const APPT_STATUS_STYLE = {
-  scheduled:  { bg: '#eff6ff', color: '#1d4ed8', label: 'Scheduled' },
-  attended:   { bg: 'var(--green-100)', color: 'var(--green-700)', label: 'Attended' },
-  missed:     { bg: '#fff7ed', color: '#c2410c', label: 'Missed' },
-  ltfu:       { bg: 'var(--red-100)', color: 'var(--red-700)', label: 'LTFU' },
+// ── Dilation panel (nurses + coordinators) ────────────────────────────────────
+const DILATION_OPTIONS = [
+  { value: 'dilated',          label: 'Dilated and ready for screening' },
+  { value: 'not_dilated',      label: 'Not yet dilated' },
+  { value: 'dilation_refused', label: 'Dilation refused' },
+]
+const DILATION_STYLE = {
+  dilated:          { bg: 'var(--teal-50,#f0fdfa)', color: 'var(--teal-700,#0f766e)', label: 'Dilated - ready' },
+  not_dilated:      { bg: 'var(--gray-100)', color: 'var(--gray-500)', label: 'Not dilated' },
+  dilation_refused: { bg: 'var(--red-50,#fef2f2)', color: 'var(--red-600,#dc2626)', label: 'Refused' },
 }
 
-function AppointmentsSection({ babyId, babyName, canMarkAttended }) {
+function DilationPanel({ babyId, baby, canEdit }) {
   const qc = useQueryClient()
-  const [dialogAppt, setDialogAppt] = useState(null)
+  const [editing, setEditing] = useState(false)
 
-  const { data: appointments = [], isLoading } = useQuery({
-    queryKey: ['appointments', babyId],
-    queryFn: () => listAppointments(babyId),
-  })
-
-  const mutation = useMutation({
-    mutationFn: ({ id, notes }) => markAppointmentAttended(id, notes),
+  const dilate = useMutation({
+    mutationFn: (val) => updateDilation(babyId, val),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['appointments', babyId] })
       qc.invalidateQueries({ queryKey: ['baby', babyId] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-      qc.invalidateQueries({ queryKey: ['alerts'] })
-      qc.invalidateQueries({ queryKey: ['alert-count'] })
-      setDialogAppt(null)
+      qc.invalidateQueries({ queryKey: ['contact-logs', babyId] })
+      setEditing(false)
     },
   })
 
-  const actionable = appointments.filter(a => a.status === 'scheduled' || a.status === 'missed')
-  // Show up to 5 most recent appointments as history
-  const history = appointments.slice(0, 5)
+  const ds = baby.dilation_status
+  const style = DILATION_STYLE[ds] || {}
 
   return (
-    <>
-      {dialogAppt && (
-        <AttendDialog
-          appointment={dialogAppt}
-          babyName={babyName}
-          isPending={mutation.isPending}
-          onConfirm={(notes) => mutation.mutate({ id: dialogAppt.id, notes })}
-          onCancel={() => setDialogAppt(null)}
-        />
-      )}
-
-      <div className="card">
-        <SectionHeading>Appointments</SectionHeading>
-
-        {isLoading && (
-          <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--gray-400)', fontSize: '.85rem' }}>
-            Loading…
-          </div>
-        )}
-
-        {/* Actionable appointments — needs attention */}
-        {canMarkAttended && actionable.length > 0 && (
-          <div style={{ marginBottom: history.length > actionable.length ? '1rem' : 0 }}>
-            {actionable.map(appt => {
-              const st = APPT_STATUS_STYLE[appt.status] || APPT_STATUS_STYLE.scheduled
-              const due = format(new Date(appt.due_date + 'T00:00:00'), 'dd MMM yyyy')
-              const daysAgo = Math.round((Date.now() - new Date(appt.due_date + 'T00:00:00')) / 86400000)
-              return (
-                <div key={appt.id} style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  gap: '.75rem', padding: '.6rem .75rem', marginBottom: '.4rem',
-                  borderRadius: 'var(--radius-sm)', border: `1.5px solid ${st.bg === '#fff7ed' ? '#fed7aa' : '#bfdbfe'}`,
-                  background: st.bg, flexWrap: 'wrap',
-                }}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: '.85rem', color: 'var(--gray-900)' }}>{due}</div>
-                    <div style={{ fontSize: '.73rem', color: st.color, fontWeight: 600, marginTop: '.1rem' }}>
-                      {st.label}{daysAgo > 0 ? ` · ${daysAgo}d overdue` : daysAgo === 0 ? ' · Today' : ''}
-                    </div>
-                  </div>
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={() => setDialogAppt(appt)}
-                    style={{ flexShrink: 0 }}
-                  >
-                    Mark Attended
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        {/* Recent appointment history */}
-        {!isLoading && history.length === 0 && (
-          <p style={{ fontSize: '.83rem', color: 'var(--gray-400)', textAlign: 'center', padding: '.5rem 0' }}>
-            No appointments scheduled yet.
-          </p>
-        )}
-
-        {history.length > 0 && (
-          <div>
-            {history.map(appt => {
-              const st = APPT_STATUS_STYLE[appt.status] || APPT_STATUS_STYLE.scheduled
-              const due = format(new Date(appt.due_date + 'T00:00:00'), 'dd MMM yyyy')
-              const isActionable = appt.status === 'scheduled' || appt.status === 'missed'
-              if (canMarkAttended && isActionable) return null  // already shown above
-              return (
-                <div key={appt.id} style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '.4rem 0', borderBottom: '1px solid var(--gray-100)', gap: '.5rem',
-                }}>
-                  <span style={{ fontSize: '.83rem', color: 'var(--gray-700)', fontWeight: 600 }}>{due}</span>
-                  <span style={{
-                    padding: '.15rem .55rem', borderRadius: 999,
-                    fontSize: '.7rem', fontWeight: 700,
-                    background: st.bg, color: st.color,
-                  }}>
-                    {st.label}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        {mutation.error && (
-          <div className="alert alert-error" style={{ fontSize: '.8rem', padding: '.4rem .65rem', marginTop: '.75rem' }}>
-            {mutation.error.response?.data?.detail || 'Failed to mark attendance.'}
-          </div>
+    <div className="card">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '.5rem' }}>
+        <SectionHeading>Dilation Status</SectionHeading>
+        {canEdit && (
+          <button className="btn btn-ghost btn-sm" style={{ marginTop: '-.15rem' }} onClick={() => setEditing(p => !p)}>
+            {editing ? 'Cancel' : 'Update'}
+          </button>
         )}
       </div>
-    </>
+
+      {ds ? (
+        <div style={{
+          display: 'inline-block', padding: '.25rem .75rem', borderRadius: 999,
+          background: style.bg, color: style.color, fontWeight: 700, fontSize: '.82rem',
+        }}>
+          {style.label}
+        </div>
+      ) : (
+        <p style={{ fontSize: '.82rem', color: 'var(--gray-400)', fontStyle: 'italic' }}>Not yet recorded</p>
+      )}
+
+      {baby.dilation_updated_at && (
+        <div style={{ fontSize: '.72rem', color: 'var(--gray-400)', marginTop: '.35rem' }}>
+          Updated {formatDistanceToNow(new Date(baby.dilation_updated_at), { addSuffix: true })}
+        </div>
+      )}
+
+      {editing && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '.35rem', marginTop: '.75rem' }}>
+          {DILATION_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              className={`btn btn-sm ${ds === opt.value ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ justifyContent: 'flex-start' }}
+              disabled={dilate.isPending}
+              onClick={() => dilate.mutate(opt.value)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Unified contact log (reminders + contact_logs merged) ─────────────────────
+function UnifiedContactLog({ babyId, reminders, canAddNote }) {
+  const qc = useQueryClient()
+  const [showNoteForm, setShowNoteForm] = useState(false)
+  const [noteText, setNoteText] = useState('')
+  const [showMsg, setShowMsg] = useState({})
+
+  const { data: contactLogs = [] } = useQuery({
+    queryKey: ['contact-logs', babyId],
+    queryFn: () => getContactLogs(babyId),
+    enabled: !!babyId,
+  })
+
+  const addNote = useMutation({
+    mutationFn: () => addContactNote(babyId, noteText),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contact-logs', babyId] })
+      setNoteText('')
+      setShowNoteForm(false)
+    },
+  })
+
+  // Build unified timeline: reminders + contact_log entries, sorted desc by date
+  const reminderItems = reminders.map(r => ({
+    key: `r-${r.id}`,
+    date: new Date(r.sent_at || r.created_at),
+    type: 'reminder',
+    data: r,
+  }))
+  const logItems = contactLogs.map(l => ({
+    key: `l-${l.id}`,
+    date: new Date(l.created_at),
+    type: 'log',
+    data: l,
+  }))
+  const all = [...reminderItems, ...logItems].sort((a, b) => b.date - a.date)
+
+  const LOG_TYPE_STYLE = {
+    sms:               { icon: '✉', bg: 'var(--teal-50)', color: 'var(--teal-700)', label: 'Auto-SMS' },
+    phone_call:        { icon: '☎', bg: '#eff6ff', color: '#1d4ed8', label: 'Phone Call' },
+    caregiver_edit:    { icon: '✎', bg: '#fef3c7', color: '#92400e', label: 'Edit' },
+    screening_request: { icon: '🔬', bg: '#f5f3ff', color: '#7c3aed', label: 'Screening' },
+    note:              { icon: '✎', bg: 'var(--gray-100)', color: 'var(--gray-600)', label: 'Note' },
+  }
+
+  return (
+    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div style={{ padding: '1rem 1.375rem', borderBottom: '1px solid var(--gray-100)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <SectionHeading>Contact Activity</SectionHeading>
+          <div style={{ fontSize: '.9rem', fontWeight: 700, color: 'var(--gray-900)', marginTop: '-.3rem' }}>
+            All reminders, calls &amp; edits
+          </div>
+        </div>
+        {canAddNote && (
+          <button className="btn btn-secondary btn-sm" onClick={() => setShowNoteForm(p => !p)}>
+            {showNoteForm ? 'Cancel' : '+ Note'}
+          </button>
+        )}
+      </div>
+
+      {showNoteForm && (
+        <div style={{ padding: '1rem 1.375rem', borderBottom: '1px solid var(--gray-100)', background: 'var(--gray-50)' }}>
+          <textarea
+            className="form-input"
+            rows={2}
+            placeholder="Add a note..."
+            value={noteText}
+            onChange={e => setNoteText(e.target.value)}
+            style={{ fontSize: '.85rem', marginBottom: '.5rem' }}
+          />
+          <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'flex-end' }}>
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowNoteForm(false)}>Cancel</button>
+            <button
+              className="btn btn-primary btn-sm"
+              disabled={!noteText.trim() || addNote.isPending}
+              onClick={() => addNote.mutate()}
+            >
+              Save Note
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ padding: '0 1.375rem' }}>
+        {all.length === 0 ? (
+          <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--gray-400)', fontSize: '.875rem' }}>
+            No contact activity yet.
+          </div>
+        ) : all.map(item => {
+          if (item.type === 'reminder') {
+            const r = item.data
+            const meta = TRIGGER_META[r.trigger] || { label: r.trigger, icon: '?', cls: 'sms' }
+            const st = STATUS_STYLE[r.status] || STATUS_STYLE.pending
+            return (
+              <div key={item.key} className="reminder-row">
+                <div className={`reminder-icon ${meta.cls}`} style={{ fontSize: '1rem' }}>{meta.icon}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.2rem' }}>
+                    <span style={{ fontWeight: 700, fontSize: '.85rem', color: 'var(--gray-800)' }}>{meta.label}</span>
+                    <span style={{ padding: '.1rem .5rem', borderRadius: 999, fontSize: '.7rem', fontWeight: 700, background: st.bg, color: st.color }}>{st.label}</span>
+                    {r.recipient_phone && <span style={{ fontSize: '.72rem', color: 'var(--gray-400)', fontFamily: 'var(--font-mono)' }}>{r.recipient_phone}</span>}
+                  </div>
+                  <div style={{ fontSize: '.75rem', color: 'var(--gray-400)' }}>
+                    {format(item.date, 'dd MMM yyyy, HH:mm')} · {formatDistanceToNow(item.date, { addSuffix: true })}
+                  </div>
+                  {r.message_body && (
+                    <>
+                      {showMsg[item.key] && (
+                        <div style={{ marginTop: '.4rem', fontSize: '.78rem', color: 'var(--gray-600)', lineHeight: 1.6, padding: '.5rem .6rem', background: 'var(--gray-50)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--gray-200)' }}>
+                          {r.message_body}
+                        </div>
+                      )}
+                      <button
+                        onClick={() => setShowMsg(p => ({ ...p, [item.key]: !p[item.key] }))}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '.72rem', color: 'var(--teal-600)', fontWeight: 600, padding: '.2rem 0', marginTop: '.15rem' }}
+                      >
+                        {showMsg[item.key] ? 'Hide ▲' : 'Show message ▼'}
+                      </button>
+                    </>
+                  )}
+                  {r.error_message && (
+                    <div style={{ fontSize: '.72rem', color: 'var(--red-600)', marginTop: '.2rem' }}>Error: {r.error_message}</div>
+                  )}
+                </div>
+              </div>
+            )
+          }
+
+          // contact_log entry
+          const l = item.data
+          const ls = LOG_TYPE_STYLE[l.log_type] || LOG_TYPE_STYLE.note
+          return (
+            <div key={item.key} className="reminder-row">
+              <div className="reminder-icon" style={{ background: ls.bg, color: ls.color, fontSize: '1rem', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                {ls.icon}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.2rem' }}>
+                  <span style={{ padding: '.1rem .5rem', borderRadius: 999, fontSize: '.7rem', fontWeight: 700, background: ls.bg, color: ls.color }}>{ls.label}</span>
+                  {l.created_by_name && <span style={{ fontSize: '.72rem', color: 'var(--gray-500)' }}>{l.created_by_name}</span>}
+                </div>
+                <div style={{ fontSize: '.82rem', color: 'var(--gray-700)', lineHeight: 1.5 }}>{l.message}</div>
+                <div style={{ fontSize: '.72rem', color: 'var(--gray-400)', marginTop: '.2rem' }}>
+                  {format(item.date, 'dd MMM yyyy, HH:mm')} · {formatDistanceToNow(item.date, { addSuffix: true })}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -1138,9 +1215,16 @@ export default function BabyDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const qc = useQueryClient()
   const [showCallPanel, setShowCallPanel] = useState(false)
+  const [showDischargeModal, setShowDischargeModal] = useState(false)
   const [exportingFull, setExportingFull] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
+
+  const reactivate = useMutation({
+    mutationFn: () => reactivateBaby(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['baby', id] }),
+  })
 
   const handleExportFull = async () => {
     setExportingFull(true)
@@ -1151,8 +1235,14 @@ export default function BabyDetailPage() {
     }
   }
 
-  const canRecordExam  = user?.role === 'ophthalmologist' || user?.role === 'central_coordinator'
+  const canRecordExam  = ['ophthalmologist', 'hospital_coordinator', 'central_coordinator'].includes(user?.role)
   const isCoordinator  = user?.role === 'hospital_coordinator' || user?.role === 'central_coordinator'
+  const isNurse        = user?.role === 'nicu_nurse'
+  const canDilation    = isNurse || isCoordinator
+  const canAddNote     = true  // all roles can add notes
+  const canDischarge   = ['ophthalmologist', 'hospital_coordinator', 'central_coordinator'].includes(user?.role)
+  const canReactivate  = isCoordinator
+  const canEditCaregiver = isCoordinator || isNurse
 
   const { data: baby, isLoading: babyLoading } = useQuery({
     queryKey: ['baby', id],
@@ -1177,7 +1267,6 @@ export default function BabyDetailPage() {
   if (babyLoading) return <div className="spinner-center"><div className="spinner" /></div>
   if (!baby) return <div className="alert alert-error">Baby not found.</div>
 
-  const phone = baby.mtn_phone || baby.airtel_phone
   const statusColors = {
     active:     { bg: 'var(--teal-50)',   color: 'var(--teal-700)',   label: 'Active' },
     ltfu:       { bg: 'var(--red-100)',   color: 'var(--red-700)',    label: 'LTFU' },
@@ -1219,7 +1308,7 @@ export default function BabyDetailPage() {
           >
             {exportingFull ? 'Exporting…' : 'Export Records'}
           </button>
-          {isCoordinator && (
+          {(isCoordinator || isNurse) && (
             <button
               className="btn btn-secondary"
               onClick={() => setShowCallPanel(p => !p)}
@@ -1227,13 +1316,68 @@ export default function BabyDetailPage() {
               ☎ Log Call
             </button>
           )}
-          {canRecordExam && (
+          {/* Discharge / Reactivate */}
+          {baby.status !== 'discharged' && canDischarge && (
+            <button
+              className="btn btn-secondary"
+              style={{ color: 'var(--red-600,#dc2626)', borderColor: 'var(--red-300,#fca5a5)' }}
+              onClick={() => setShowDischargeModal(true)}
+            >
+              Discharge
+            </button>
+          )}
+          {baby.status === 'discharged' && canReactivate && (
+            <button
+              className="btn btn-secondary"
+              disabled={reactivate.isPending}
+              onClick={() => reactivate.mutate()}
+            >
+              {reactivate.isPending ? 'Reactivating…' : 'Reactivate'}
+            </button>
+          )}
+          {canRecordExam && baby.status !== 'discharged' && (
             <Link to={`/babies/${baby.id}/exam`} className="btn btn-primary">
               + Record Exam
             </Link>
           )}
         </div>
       </div>
+
+      {/* ── Discharge modal ────────────────────────────────────────────── */}
+      {showDischargeModal && (
+        <DischargeModal
+          babyId={id}
+          babyName={baby.full_name}
+          onClose={() => setShowDischargeModal(false)}
+          onDischarged={() => {
+            setShowDischargeModal(false)
+            qc.invalidateQueries({ queryKey: ['baby', id] })
+            qc.invalidateQueries({ queryKey: ['contact-logs', id] })
+            qc.invalidateQueries({ queryKey: ['nurse-dashboard'] })
+            qc.invalidateQueries({ queryKey: ['dashboard'] })
+          }}
+        />
+      )}
+
+      {/* ── Discharged notice banner ────────────────────────────────────── */}
+      {baby.status === 'discharged' && (
+        <div style={{
+          background: 'var(--gray-100)', border: '1px solid var(--gray-300)',
+          borderRadius: 'var(--radius)', padding: '.75rem 1.1rem',
+          marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '.75rem',
+        }}>
+          <span style={{ fontSize: '1.1rem' }}>✓</span>
+          <div>
+            <span style={{ fontWeight: 700, color: 'var(--gray-700)', fontSize: '.9rem' }}>
+              Baby discharged
+            </span>
+            <span style={{ color: 'var(--gray-500)', fontSize: '.82rem', marginLeft: '.5rem' }}>
+              No further SMS reminders will be sent.
+              {canReactivate && ' Use "Reactivate" above to resume follow-up.'}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* ── Call log panel (inline) ─────────────────────────────────────── */}
       {showCallPanel && (
@@ -1270,7 +1414,7 @@ export default function BabyDetailPage() {
       {/* ── Two-column layout ───────────────────────────────────────────── */}
       {activeTab === 'overview' && <div className="profile-grid">
 
-        {/* LEFT: timeline + reminder log */}
+        {/* LEFT: timeline + contact activity log */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
           {/* Exam timeline */}
@@ -1286,44 +1430,34 @@ export default function BabyDetailPage() {
             )}
           </div>
 
-          {/* Reminder & call log */}
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            <div style={{ padding: '1rem 1.375rem', borderBottom: '1px solid var(--gray-100)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <SectionHeading>Contact Activity</SectionHeading>
-                <div style={{ fontSize: '.9rem', fontWeight: 700, color: 'var(--gray-900)', marginTop: '-.3rem' }}>
-                  All reminders &amp; calls
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '.5rem', fontSize: '.72rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                {[
-                  { label: 'SMS', cls: 'sms', bg: 'var(--teal-50)', color: 'var(--teal-700)' },
-                  { label: 'Call', cls: 'call', bg: '#eff6ff', color: '#1d4ed8' },
-                  { label: 'LTFU', cls: 'ltfu', bg: 'var(--red-50)', color: 'var(--red-600)' },
-                ].map(l => (
-                  <span key={l.label} style={{ padding: '.15rem .5rem', borderRadius: 999, background: l.bg, color: l.color, fontWeight: 700 }}>{l.label}</span>
-                ))}
-              </div>
-            </div>
-            <div style={{ padding: '0 1.375rem' }}>
-              <ReminderLog reminders={reminders} />
-            </div>
-          </div>
+          {/* Unified contact activity log */}
+          <UnifiedContactLog babyId={id} reminders={reminders} canAddNote={canAddNote} />
 
         </div>
 
-        {/* RIGHT: contact + clinical info */}
+        {/* RIGHT: clinical info */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
-          {/* Appointments */}
-          <AppointmentsSection
-            babyId={id}
-            babyName={baby.full_name}
-            canMarkAttended={isCoordinator || canRecordExam}
-          />
+          {/* Dilation status - nurses + coordinators */}
+          {canDilation && (
+            <DilationPanel babyId={id} baby={baby} canEdit={canDilation} />
+          )}
+          {!canDilation && baby.dilation_status && (
+            <div className="card">
+              <SectionHeading>Dilation Status</SectionHeading>
+              <div style={{
+                display: 'inline-block', padding: '.25rem .75rem', borderRadius: 999,
+                background: DILATION_STYLE[baby.dilation_status]?.bg,
+                color: DILATION_STYLE[baby.dilation_status]?.color,
+                fontWeight: 700, fontSize: '.82rem',
+              }}>
+                {DILATION_STYLE[baby.dilation_status]?.label}
+              </div>
+            </div>
+          )}
 
-          {/* Contact details */}
-          <CaregiverCard baby={baby} />
+          {/* Caregiver / contact (editable) */}
+          <CaregiverCard baby={baby} canEdit={canEditCaregiver} />
 
           {/* Birth / clinical info */}
           <div className="card">
@@ -1340,13 +1474,21 @@ export default function BabyDetailPage() {
           <div className="card">
             <SectionHeading>Risk Factors</SectionHeading>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.4rem' }}>
-              <RiskChip active={baby.oxygen_therapy}    label="Oxygen Therapy" />
-              <RiskChip active={baby.blood_transfusion} label="Blood Transfusion" />
-              <RiskChip active={baby.sepsis}            label="Sepsis" />
-              <RiskChip active={baby.inotropes}         label="Inotropes" />
-              <RiskChip active={baby.anaemia}           label="Anaemia" />
+              <RiskChip active={baby.oxygen_therapy}         label="Oxygen Therapy" />
+              <RiskChip active={baby.mechanical_ventilation} label="Mechanical Ventilation / CPAP" />
+              <RiskChip active={baby.blood_transfusion}      label="Blood Transfusion" />
+              <RiskChip active={baby.sepsis}                 label="Sepsis" />
+              <RiskChip active={baby.inotropes}              label="Inotropes" />
+              <RiskChip active={baby.anaemia}                label="Anaemia" />
+              <RiskChip active={baby.surfactant_therapy}     label="Surfactant Therapy" />
+              <RiskChip active={baby.apnoea}                 label="Apnoea" />
+              <RiskChip active={baby.nec}                    label="NEC" />
+              <RiskChip active={baby.twins_or_multiple}      label="Twins / Multiple Birth" />
+              <RiskChip active={baby.phototherapy}           label="Phototherapy" />
             </div>
-            {![baby.oxygen_therapy, baby.blood_transfusion, baby.sepsis, baby.inotropes, baby.anaemia].some(Boolean) && (
+            {![baby.oxygen_therapy, baby.mechanical_ventilation, baby.blood_transfusion, baby.sepsis,
+               baby.inotropes, baby.anaemia, baby.surfactant_therapy, baby.apnoea,
+               baby.nec, baby.twins_or_multiple, baby.phototherapy].some(Boolean) && (
               <p style={{ fontSize: '.8rem', color: 'var(--gray-400)', marginTop: '.5rem' }}>No risk factors recorded.</p>
             )}
           </div>

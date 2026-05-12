@@ -8,8 +8,13 @@ from app.database import get_db
 from app.models.baby import Baby, BabyStatus
 from app.models.user import User, UserRole
 from app.models.hospital import Hospital
-from app.schemas.baby import BabyCreate, BabyUpdate, BabyOut, BabyDashboardItem
+from app.models.contact_log import ContactLog, ContactLogType
+from app.models.appointment import Appointment, AppointmentStatus
+from app.models.outcome import Outcome, DischargeStatus
+from app.schemas.baby import BabyCreate, BabyUpdate, BabyOut, BabyDashboardItem, DilationUpdate
 from app.auth.jwt import get_current_user
+from pydantic import BaseModel
+from typing import Optional
 
 router = APIRouter(prefix="/api/babies", tags=["babies"])
 
@@ -52,10 +57,18 @@ def list_babies(
     current_user: User = Depends(get_current_user),
 ):
     query = db.query(Baby)
-    if current_user.role != UserRole.CENTRAL_COORDINATOR:
+    if current_user.role == UserRole.CENTRAL_COORDINATOR:
+        if hospital_id:
+            query = query.filter(Baby.hospital_id == hospital_id)
+    elif current_user.role == UserRole.OPHTHALMOLOGIST:
+        # Ophthalmologists see babies they have personally examined OR enrolled
+        from app.models.exam import Exam
+        examined_ids = db.query(Exam.baby_id).filter(Exam.examiner_id == current_user.id).subquery()
+        query = query.filter(
+            (Baby.id.in_(examined_ids)) | (Baby.enrolled_by_id == current_user.id)
+        )
+    else:
         query = query.filter(Baby.hospital_id == current_user.hospital_id)
-    elif hospital_id:
-        query = query.filter(Baby.hospital_id == hospital_id)
     return query.order_by(Baby.enrolled_at.desc()).all()
 
 
@@ -145,8 +158,74 @@ def update_baby(
         raise HTTPException(status_code=404, detail="Baby not found")
     if current_user.role != UserRole.CENTRAL_COORDINATOR and baby.hospital_id != current_user.hospital_id:
         raise HTTPException(status_code=403, detail="Access denied")
-    for field, value in data.model_dump(exclude_unset=True).items():
-        setattr(baby, field, value)
+
+    # Caregiver-facing field labels for audit log
+    CAREGIVER_FIELDS = {
+        "caregiver_name": "Caregiver name",
+        "mtn_phone": "MTN number",
+        "airtel_phone": "Airtel number",
+        "language_preference": "Language preference",
+    }
+
+    changes = data.model_dump(exclude_unset=True)
+    for field, new_val in changes.items():
+        old_val = getattr(baby, field, None)
+        setattr(baby, field, new_val)
+        # Write a contact log entry for caregiver-detail fields
+        if field in CAREGIVER_FIELDS and str(old_val) != str(new_val):
+            label = CAREGIVER_FIELDS[field]
+            log = ContactLog(
+                baby_id=baby_id,
+                created_by_id=current_user.id,
+                log_type=ContactLogType.CAREGIVER_EDIT,
+                message=f"{label} updated by {current_user.full_name}: {old_val or '(none)'} → {new_val or '(none)'}",
+                field_name=field,
+                old_value=str(old_val) if old_val is not None else None,
+                new_value=str(new_val) if new_val is not None else None,
+            )
+            db.add(log)
+
+    db.commit()
+    db.refresh(baby)
+    return baby
+
+
+@router.patch("/{baby_id}/dilation", response_model=BabyOut)
+def update_dilation(
+    baby_id: UUID,
+    data: DilationUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """NICU nurse sets dilation status before ophthalmologist screening."""
+    if current_user.role not in (UserRole.NICU_NURSE, UserRole.HOSPITAL_COORDINATOR, UserRole.CENTRAL_COORDINATOR):
+        raise HTTPException(status_code=403, detail="Only nurses and coordinators can update dilation status")
+
+    baby = db.query(Baby).filter(Baby.id == baby_id).first()
+    if not baby:
+        raise HTTPException(status_code=404, detail="Baby not found")
+    if current_user.role != UserRole.CENTRAL_COORDINATOR and baby.hospital_id != current_user.hospital_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    from datetime import datetime, timezone
+    DILATION_LABELS = {
+        "dilated": "Dilated and ready for screening",
+        "not_dilated": "Not yet dilated",
+        "dilation_refused": "Dilation refused",
+    }
+    label = DILATION_LABELS.get(data.dilation_status.value, data.dilation_status.value)
+
+    baby.dilation_status = data.dilation_status
+    baby.dilation_updated_at = datetime.now(timezone.utc)
+    baby.dilation_updated_by_id = current_user.id
+
+    log = ContactLog(
+        baby_id=baby_id,
+        created_by_id=current_user.id,
+        log_type=ContactLogType.NOTE,
+        message=f"Dilation status set to '{label}' by {current_user.full_name}",
+    )
+    db.add(log)
     db.commit()
     db.refresh(baby)
     return baby
@@ -166,10 +245,17 @@ def dashboard_urgency(
     from app.models.exam import Exam
 
     query = db.query(Baby)
-    if current_user.role != UserRole.CENTRAL_COORDINATOR:
+    if current_user.role == UserRole.CENTRAL_COORDINATOR:
+        if hospital_id:
+            query = query.filter(Baby.hospital_id == hospital_id)
+    elif current_user.role == UserRole.OPHTHALMOLOGIST:
+        from app.models.exam import Exam as _Exam
+        examined_ids = db.query(_Exam.baby_id).filter(_Exam.examiner_id == current_user.id).subquery()
+        query = query.filter(
+            (Baby.id.in_(examined_ids)) | (Baby.enrolled_by_id == current_user.id)
+        )
+    else:
         query = query.filter(Baby.hospital_id == current_user.hospital_id)
-    elif hospital_id:
-        query = query.filter(Baby.hospital_id == hospital_id)
 
     if q:
         like = f"%{q}%"
@@ -235,3 +321,146 @@ def dashboard_urgency(
     urgency_order = {"ltfu": 0, "due_today": 1, "due_soon": 2, "on_track": 3}
     items.sort(key=lambda x: (urgency_order.get(x.urgency, 9), x.next_due_date or date.max))
     return items
+
+
+# ── Discharge schema ──────────────────────────────────────────────────────────
+
+DISCHARGE_REASON_LABELS = {
+    "completed_no_rop":  "Completed - no ROP detected",
+    "completed_treated": "Completed - treated successfully",
+    "referred_national": "Referred to national centre",
+    "referred_abroad":   "Referred abroad",
+    "died":              "Died",
+    "lost":              "Lost to follow-up",
+}
+
+class DischargeIn(BaseModel):
+    discharge_reason: str   # one of DischargeStatus values (except "ongoing")
+    notes: Optional[str] = None
+
+
+# ── Discharge endpoint ────────────────────────────────────────────────────────
+
+@router.post("/{baby_id}/discharge", response_model=BabyOut)
+def discharge_baby(
+    baby_id: UUID,
+    data: DischargeIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Transition a baby from Active to Discharged:
+      1. Set baby.status = DISCHARGED
+      2. Cancel all future SCHEDULED appointments (prevents further reminders)
+      3. Upsert the Outcome row with discharge_status + discharge_date = today
+      4. Log the action to contact_logs
+    """
+    allowed = (
+        UserRole.HOSPITAL_COORDINATOR,
+        UserRole.CENTRAL_COORDINATOR,
+        UserRole.OPHTHALMOLOGIST,
+    )
+    if current_user.role not in allowed:
+        raise HTTPException(status_code=403, detail="Not permitted to discharge babies")
+
+    baby = db.query(Baby).filter(Baby.id == baby_id).first()
+    if not baby:
+        raise HTTPException(status_code=404, detail="Baby not found")
+    if current_user.role != UserRole.CENTRAL_COORDINATOR and baby.hospital_id != current_user.hospital_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if baby.status == BabyStatus.DISCHARGED:
+        raise HTTPException(status_code=409, detail="Baby is already discharged")
+
+    # Validate discharge reason
+    try:
+        discharge_status = DischargeStatus(data.discharge_reason)
+    except ValueError:
+        raise HTTPException(status_code=422, detail=f"Invalid discharge reason: {data.discharge_reason}")
+    if discharge_status == DischargeStatus.ONGOING:
+        raise HTTPException(status_code=422, detail="'ongoing' is not a valid discharge reason")
+
+    from datetime import datetime, timezone
+
+    # 1. Update baby status
+    baby.status = BabyStatus.DISCHARGED
+
+    # 2. Cancel all future SCHEDULED appointments
+    future_appts = (
+        db.query(Appointment)
+        .filter(
+            Appointment.baby_id == baby_id,
+            Appointment.status == AppointmentStatus.SCHEDULED,
+            Appointment.due_date >= date.today(),
+        )
+        .all()
+    )
+    for appt in future_appts:
+        appt.status = AppointmentStatus.ATTENDED  # closes the appointment cleanly
+
+    # 3. Upsert Outcome row
+    outcome = db.query(Outcome).filter(Outcome.baby_id == baby_id).first()
+    if outcome is None:
+        outcome = Outcome(baby_id=baby_id)
+        db.add(outcome)
+    outcome.discharge_status = discharge_status
+    outcome.discharge_date = date.today()
+    if data.notes and not outcome.notes:
+        outcome.notes = data.notes
+
+    # 4. Contact log entry
+    reason_label = DISCHARGE_REASON_LABELS.get(data.discharge_reason, data.discharge_reason)
+    log_msg = f"Baby discharged by {current_user.full_name} — {reason_label}"
+    if data.notes:
+        log_msg += f". Notes: {data.notes}"
+    log = ContactLog(
+        baby_id=baby_id,
+        created_by_id=current_user.id,
+        log_type=ContactLogType.NOTE,
+        message=log_msg,
+    )
+    db.add(log)
+
+    db.commit()
+    db.refresh(baby)
+    return baby
+
+
+# ── Reactivate endpoint ───────────────────────────────────────────────────────
+
+@router.post("/{baby_id}/reactivate", response_model=BabyOut)
+def reactivate_baby(
+    baby_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Coordinators only: reverse a discharge and set the baby back to Active."""
+    if current_user.role not in (UserRole.HOSPITAL_COORDINATOR, UserRole.CENTRAL_COORDINATOR):
+        raise HTTPException(status_code=403, detail="Only coordinators can reactivate a baby")
+
+    baby = db.query(Baby).filter(Baby.id == baby_id).first()
+    if not baby:
+        raise HTTPException(status_code=404, detail="Baby not found")
+    if current_user.role != UserRole.CENTRAL_COORDINATOR and baby.hospital_id != current_user.hospital_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if baby.status != BabyStatus.DISCHARGED:
+        raise HTTPException(status_code=409, detail="Baby is not currently discharged")
+
+    baby.status = BabyStatus.ACTIVE
+
+    # Clear the discharge fields on the outcome row so reports are accurate
+    outcome = db.query(Outcome).filter(Outcome.baby_id == baby_id).first()
+    if outcome:
+        outcome.discharge_status = DischargeStatus.ONGOING
+        outcome.discharge_date = None
+
+    log = ContactLog(
+        baby_id=baby_id,
+        created_by_id=current_user.id,
+        log_type=ContactLogType.NOTE,
+        message=f"Baby reactivated by {current_user.full_name}",
+    )
+    db.add(log)
+
+    db.commit()
+    db.refresh(baby)
+    return baby

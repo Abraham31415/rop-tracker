@@ -36,6 +36,9 @@ def reports_summary(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    from fastapi import HTTPException
+    if user.role not in (UserRole.HOSPITAL_COORDINATOR, UserRole.CENTRAL_COORDINATOR):
+        raise HTTPException(status_code=403, detail="Reports are available to coordinators only")
     is_central = user.role == UserRole.CENTRAL_COORDINATOR
 
     # Base baby query scoped by hospital
@@ -143,6 +146,9 @@ def population_report(
     user: User = Depends(get_current_user),
 ):
     """Return all data needed to generate the population/program PDF report."""
+    from fastapi import HTTPException
+    if user.role not in (UserRole.HOSPITAL_COORDINATOR, UserRole.CENTRAL_COORDINATOR):
+        raise HTTPException(status_code=403, detail="Reports are available to coordinators only")
     is_central = user.role == UserRole.CENTRAL_COORDINATOR
 
     # ── Scope hospital ────────────────────────────────────────────────────────
@@ -314,6 +320,9 @@ def outcomes_report(
     user: User = Depends(get_current_user),
 ):
     """Outcomes summary: treatment breakdown, visual outcomes, referral stats."""
+    from fastapi import HTTPException
+    if user.role not in (UserRole.HOSPITAL_COORDINATOR, UserRole.CENTRAL_COORDINATOR):
+        raise HTTPException(status_code=403, detail="Reports are available to coordinators only")
     is_central = user.role == UserRole.CENTRAL_COORDINATOR
     scope_id = hospital_id if hospital_id else (None if is_central else user.hospital_id)
 

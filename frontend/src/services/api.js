@@ -78,6 +78,36 @@ export const listReferrals = (babyId) => api.get(`/api/referrals/baby/${babyId}`
 export const createReferral = (babyId, data) => api.post(`/api/referrals/baby/${babyId}`, data).then(r => r.data)
 export const updateReferralStatus = (referralId, data) => api.patch(`/api/referrals/${referralId}`, data).then(r => r.data)
 
+// ── Discharge / reactivate ────────────────────────────────────────────────────
+export const dischargeBaby = (id, discharge_reason, notes) =>
+  api.post(`/api/babies/${id}/discharge`, { discharge_reason, notes }).then(r => r.data)
+export const reactivateBaby = (id) =>
+  api.post(`/api/babies/${id}/reactivate`).then(r => r.data)
+
+// ── Dilation ──────────────────────────────────────────────────────────────────
+export const updateDilation = (babyId, dilation_status) =>
+  api.patch(`/api/babies/${babyId}/dilation`, { dilation_status }).then(r => r.data)
+
+// ── Contact logs ──────────────────────────────────────────────────────────────
+export const getContactLogs = (babyId) => api.get(`/api/contact-logs/${babyId}`).then(r => r.data)
+export const addContactNote = (babyId, message) =>
+  api.post(`/api/contact-logs/${babyId}/note`, { message }).then(r => r.data)
+
+// ── Screening requests ────────────────────────────────────────────────────────
+export const createScreeningRequest = (baby_id, notes) =>
+  api.post('/api/screening-requests/', { baby_id, notes }).then(r => r.data)
+export const getPendingScreeningRequests = () =>
+  api.get('/api/screening-requests/pending').then(r => r.data)
+export const getActiveScreeningRequest = (babyId) =>
+  api.get(`/api/screening-requests/baby/${babyId}`).then(r => r.data)
+export const claimScreeningRequest = (id) =>
+  api.post(`/api/screening-requests/${id}/claim`).then(r => r.data)
+export const completeScreeningRequest = (id) =>
+  api.post(`/api/screening-requests/${id}/complete`).then(r => r.data)
+
+// ── Ophthalmologist hospital list ─────────────────────────────────────────────
+export const getMyHospitals = () => api.get('/api/exams/my-hospitals').then(r => r.data)
+
 // ── Users ─────────────────────────────────────────────────────────────────────
 export const listUsers = () => api.get('/api/users/').then(r => r.data)
 export const createUser = (data) => api.post('/api/users/', data).then(r => r.data)
