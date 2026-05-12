@@ -49,6 +49,7 @@ function navItems(role) {
     { to: '/notifications',  label: 'Notifications',   icon: <IconBell />,     roles: ['ophthalmologist','hospital_coordinator','central_coordinator'] },
     { to: '/reports',        label: 'Reports',         icon: <IconBarChart />, roles: ['hospital_coordinator','central_coordinator'] },
     { to: '/network',        label: 'Network Overview',icon: <IconNetwork />,  roles: ['central_coordinator'] },
+    { to: '/analytics',      label: 'Analytics',       icon: <IconBarChart />, roles: ['central_coordinator'] },
     { to: '/settings',       label: 'Settings',        icon: <IconSettings />, roles: ['hospital_coordinator','central_coordinator'] },
   ]
   return all.filter(item => item.roles.includes(role))
@@ -158,7 +159,7 @@ function useBreadcrumbs(path) {
     if (segments[2] === 'exam') return [...base, { label: 'Baby Profile', to: `/babies/${segments[1]}` }, { label: 'Record Exam', to: path }]
     return base
   }
-  const PAGE_LABELS = { enroll: 'Enroll Baby', network: 'Network Overview', notifications: 'Notifications', reports: 'Reports', settings: 'Settings', search: 'Search', appointments: 'Appointments' }
+  const PAGE_LABELS = { enroll: 'Enroll Baby', network: 'Network Overview', analytics: 'Analytics', notifications: 'Notifications', reports: 'Reports', settings: 'Settings', search: 'Search', appointments: 'Appointments' }
   if (PAGE_LABELS[segments[0]]) return [{ label: 'Dashboard', to: '/dashboard' }, { label: PAGE_LABELS[segments[0]], to: path }]
   return [{ label: 'Dashboard', to: '/dashboard' }]
 }
