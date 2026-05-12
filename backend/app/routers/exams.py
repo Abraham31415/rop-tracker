@@ -16,6 +16,49 @@ from app.services.scheduling import derive_worst_finding, calculate_next_exam_we
 router = APIRouter(prefix="/api/exams", tags=["exams"])
 
 
+@router.get("/my-hospitals")
+def get_my_hospitals(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return hospitals relevant to this ophthalmologist for the enroll form.
+
+    Returns { recent: [...], all: [...] } where 'recent' are hospitals where
+    this ophthalmologist has previously recorded exams, and 'all' is every
+    active hospital in the system.
+    """
+    if current_user.role not in (
+        UserRole.OPHTHALMOLOGIST, UserRole.HOSPITAL_COORDINATOR, UserRole.CENTRAL_COORDINATOR
+    ):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    def _h(hospital: Hospital) -> dict:
+        return {"id": str(hospital.id), "name": hospital.name, "district": hospital.district}
+
+    # Hospitals where this user has previously examined babies
+    examined_baby_ids = (
+        db.query(Exam.baby_id)
+        .filter(Exam.examiner_id == current_user.id)
+        .distinct()
+        .subquery()
+    )
+    recent_hospital_ids = (
+        db.query(Baby.hospital_id)
+        .filter(Baby.id.in_(examined_baby_ids))
+        .distinct()
+        .all()
+    )
+    recent_ids = {r[0] for r in recent_hospital_ids}
+    if current_user.hospital_id:
+        recent_ids.add(current_user.hospital_id)
+
+    all_hospitals = db.query(Hospital).filter(Hospital.is_active == True).order_by(Hospital.name).all()
+    recent = [_h(h) for h in all_hospitals if h.id in recent_ids]
+    rest   = [_h(h) for h in all_hospitals if h.id not in recent_ids]
+
+    return {"recent": recent, "all": rest}
+
+
 @router.post("/", response_model=ExamOut)
 def record_exam(
     data: ExamCreate,
