@@ -33,7 +33,12 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def _create_enum(name: str, *values: str) -> None:
     vals = ", ".join(f"'{v}'" for v in values)
-    op.execute(f"CREATE TYPE {name} AS ENUM ({vals})")
+    op.execute(f"""
+        DO $$ BEGIN
+            CREATE TYPE {name} AS ENUM ({vals});
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
+    """)
 
 
 def _drop_enum(name: str) -> None:
@@ -80,6 +85,7 @@ def upgrade() -> None:
         sa.Column("region", sa.String(), nullable=False),
         sa.Column("is_active", sa.Boolean(), nullable=True, server_default="true"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
+        if_not_exists=True,
     )
 
     # ── users ────────────────────────────────────────────────────────────────
@@ -94,8 +100,9 @@ def upgrade() -> None:
         sa.Column("is_active", sa.Boolean(), nullable=True, server_default="true"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
         sa.UniqueConstraint("email"),
+        if_not_exists=True,
     )
-    op.create_index("ix_users_email", "users", ["email"])
+    op.create_index("ix_users_email", "users", ["email"], if_not_exists=True)
 
     # ── babies ───────────────────────────────────────────────────────────────
     op.create_table(
@@ -122,6 +129,7 @@ def upgrade() -> None:
         sa.Column("enrolled_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
         sa.Column("enrolled_by_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=True),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
+        if_not_exists=True,
     )
 
     # ── exams ────────────────────────────────────────────────────────────────
@@ -161,6 +169,7 @@ def upgrade() -> None:
         sa.Column("vf_functional_impression", postgresql.ENUM(name="vffunctionalimpression", create_type=False), nullable=True),
         sa.Column("vf_notes", sa.Text(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
+        if_not_exists=True,
     )
 
     # ── appointments ─────────────────────────────────────────────────────────
@@ -177,6 +186,7 @@ def upgrade() -> None:
         sa.Column("coordinator_alerted", sa.DateTime(timezone=True), nullable=True),
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
+        if_not_exists=True,
     )
 
     # ── reminders ────────────────────────────────────────────────────────────
@@ -197,6 +207,7 @@ def upgrade() -> None:
         sa.Column("sent_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("acknowledged_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
+        if_not_exists=True,
     )
 
     # ── alerts ───────────────────────────────────────────────────────────────
@@ -213,6 +224,7 @@ def upgrade() -> None:
         sa.Column("dismissed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("dismissed_by_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
+        if_not_exists=True,
     )
 
     # ── outcomes ─────────────────────────────────────────────────────────────
@@ -231,6 +243,7 @@ def upgrade() -> None:
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
+        if_not_exists=True,
     )
 
     # ── referrals ────────────────────────────────────────────────────────────
@@ -247,6 +260,7 @@ def upgrade() -> None:
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
+        if_not_exists=True,
     )
 
 

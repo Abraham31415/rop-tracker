@@ -27,7 +27,9 @@ NEW_COLUMNS = [
 
 def upgrade() -> None:
     for col in NEW_COLUMNS:
-        op.add_column("babies", sa.Column(col, sa.Boolean(), nullable=True, server_default="false"))
+        op.execute(
+            f"ALTER TABLE babies ADD COLUMN IF NOT EXISTS {col} BOOLEAN DEFAULT false"
+        )
 
 
 def downgrade() -> None:
