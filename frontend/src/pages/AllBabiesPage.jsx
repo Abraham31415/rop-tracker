@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { getDashboard, listHospitals } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
@@ -33,9 +33,10 @@ function urgencyBadge(u) {
 export default function AllBabiesPage() {
   const { user } = useAuth()
   const isCentral = user?.role === 'central_coordinator'
+  const [searchParams] = useSearchParams()
 
   const [q, setQ] = useState('')
-  const [urgency, setUrgency] = useState('')
+  const [urgency, setUrgency] = useState(() => searchParams.get('urgency') || '')
   const [stage, setStage] = useState('')
   const [hospitalId, setHospitalId] = useState('')
 

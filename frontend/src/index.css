@@ -322,6 +322,7 @@ button, [role="button"] { touch-action: manipulation; }
   transition: transform .2s, box-shadow .2s;
 }
 .urgency-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+.urgency-card:focus-visible { outline: 2px solid var(--teal-500); outline-offset: 2px; }
 .urgency-card::before {
   content: '';
   position: absolute;

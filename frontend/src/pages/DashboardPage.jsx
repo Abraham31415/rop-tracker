@@ -49,9 +49,17 @@ function dueDateText(days, dateStr) {
   return formatted
 }
 
-function UrgencyCard({ value, label, type, icon }) {
+function UrgencyCard({ value, label, type, icon, to }) {
+  const navigate = useNavigate()
   return (
-    <div className={`urgency-card ${type}`}>
+    <div
+      className={`urgency-card ${type}`}
+      onClick={() => navigate(to)}
+      style={{ cursor: 'pointer' }}
+      role="button"
+      tabIndex={0}
+      onKeyDown={e => e.key === 'Enter' && navigate(to)}
+    >
       <div className="urgency-card-icon">{icon}</div>
       <div className="urgency-card-value">{value}</div>
       <div className="urgency-card-label">{label}</div>
@@ -257,11 +265,11 @@ export default function DashboardPage() {
 
       {/* Summary stat cards */}
       <div className="urgency-grid">
-        <UrgencyCard value={counts.ltfu}             label="Lost to Follow-Up" type="ltfu"      icon="!" />
-        <UrgencyCard value={counts.due_today}        label="Due Today"          type="due-today" icon="!" />
-        <UrgencyCard value={counts.due_soon}         label="Due in 1–2 Days"   type="due-soon"  icon="~" />
-        <UrgencyCard value={counts.on_track}         label="On Track"           type="on-track"  icon="✓" />
-        <UrgencyCard value={displayBabies.length}    label="Total Enrolled"     type="total"     icon="+" />
+        <UrgencyCard value={counts.ltfu}          label="Lost to Follow-Up" type="ltfu"      icon="!" to="/babies?urgency=ltfu" />
+        <UrgencyCard value={counts.due_today}     label="Due Today"          type="due-today" icon="!" to="/babies?urgency=due_today" />
+        <UrgencyCard value={counts.due_soon}      label="Due in 1–2 Days"   type="due-soon"  icon="~" to="/babies?urgency=due_soon" />
+        <UrgencyCard value={counts.on_track}      label="On Track"           type="on-track"  icon="✓" to="/babies?urgency=on_track" />
+        <UrgencyCard value={displayBabies.length} label="Total Enrolled"     type="total"     icon="+" to="/babies" />
       </div>
 
       {isLoading ? (
