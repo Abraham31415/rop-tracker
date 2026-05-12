@@ -435,14 +435,14 @@ function VisualFunctionTab({ exams }) {
                   <td style={{ padding: '.55rem .9rem', fontWeight: 700, color: 'var(--gray-800)', whiteSpace: 'nowrap' }}>
                     {format(new Date(exam.exam_date + 'T00:00:00'), 'dd MMM yyyy')}
                   </td>
-                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FIXATION_LABELS[exam.vf_right_fixation] || '—'}</td>
-                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FOLLOWING_LABELS[exam.vf_right_following] || '—'}</td>
-                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_CSM_LABELS[exam.vf_right_csm] || '—'}</td>
-                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FIXATION_LABELS[exam.vf_left_fixation] || '—'}</td>
-                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FOLLOWING_LABELS[exam.vf_left_following] || '—'}</td>
-                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_CSM_LABELS[exam.vf_left_csm] || '—'}</td>
+                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FIXATION_LABELS[exam.vf_right_fixation] || '-'}</td>
+                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FOLLOWING_LABELS[exam.vf_right_following] || '-'}</td>
+                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_CSM_LABELS[exam.vf_right_csm] || '-'}</td>
+                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FIXATION_LABELS[exam.vf_left_fixation] || '-'}</td>
+                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FOLLOWING_LABELS[exam.vf_left_following] || '-'}</td>
+                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_CSM_LABELS[exam.vf_left_csm] || '-'}</td>
                   <td style={{ padding: '.55rem .9rem', color: 'var(--teal-700)', fontWeight: 600, fontSize: '.75rem' }}>
-                    {VF_IMPRESSION_LABELS[exam.vf_functional_impression] || '—'}
+                    {VF_IMPRESSION_LABELS[exam.vf_functional_impression] || '-'}
                   </td>
                 </tr>
               ))}
@@ -531,7 +531,7 @@ function OutcomeSection({ babyId, canEdit }) {
           <div className="form-group">
             <label className="form-label">Treatment Type</label>
             <select className="form-control" {...field('treatment_type')}>
-              <option value="">— select —</option>
+              <option value="">(select)</option>
               {Object.entries(TREATMENT_TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </div>
@@ -539,7 +539,7 @@ function OutcomeSection({ babyId, canEdit }) {
             <div className="form-group">
               <label className="form-label">Eye Treated</label>
               <select className="form-control" {...field('treatment_eye')}>
-                <option value="">— select —</option>
+                <option value="">(select)</option>
                 {Object.entries(TREATMENT_EYE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
@@ -551,7 +551,7 @@ function OutcomeSection({ babyId, canEdit }) {
           <div className="form-group">
             <label className="form-label">Treatment Hospital</label>
             <select className="form-control" {...field('treatment_hospital_id')}>
-              <option value="">— same hospital —</option>
+              <option value="">(same hospital)</option>
               {hospitals.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
             </select>
           </div>
@@ -563,14 +563,14 @@ function OutcomeSection({ babyId, canEdit }) {
             <div className="form-group">
               <label className="form-label">Visual Outcome</label>
               <select className="form-control" {...field('visual_outcome')}>
-                <option value="">— select —</option>
+                <option value="">(select)</option>
                 {Object.entries(VISUAL_OUTCOME_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
             <div className="form-group">
               <label className="form-label">Discharge Status</label>
               <select className="form-control" {...field('discharge_status')}>
-                <option value="">— select —</option>
+                <option value="">(select)</option>
                 {Object.entries(DISCHARGE_STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
@@ -611,17 +611,17 @@ function OutcomeSection({ babyId, canEdit }) {
       </div>
       {outcome ? (
         <>
-          <InfoRow label="Treatment" value={TREATMENT_TYPE_LABELS[outcome.treatment_type] || '—'} />
+          <InfoRow label="Treatment" value={TREATMENT_TYPE_LABELS[outcome.treatment_type] || '-'} />
           {outcome.treatment_type && outcome.treatment_type !== 'none' && (
             <>
-              <InfoRow label="Eye" value={TREATMENT_EYE_LABELS[outcome.treatment_eye] || '—'} />
-              <InfoRow label="Treat. Date" value={outcome.treatment_date ? format(new Date(outcome.treatment_date + 'T00:00:00'), 'dd MMM yyyy') : '—'} />
+              <InfoRow label="Eye" value={TREATMENT_EYE_LABELS[outcome.treatment_eye] || '-'} />
+              <InfoRow label="Treat. Date" value={outcome.treatment_date ? format(new Date(outcome.treatment_date + 'T00:00:00'), 'dd MMM yyyy') : '-'} />
               {outcome.treatment_hospital_name && <InfoRow label="Treat. Hospital" value={outcome.treatment_hospital_name} />}
               {outcome.treating_ophthalmologist && <InfoRow label="Ophthalmologist" value={outcome.treating_ophthalmologist} />}
             </>
           )}
-          <InfoRow label="Visual Outcome" value={VISUAL_OUTCOME_LABELS[outcome.visual_outcome] || '—'} />
-          <InfoRow label="Discharge" value={DISCHARGE_STATUS_LABELS[outcome.discharge_status] || '—'} />
+          <InfoRow label="Visual Outcome" value={VISUAL_OUTCOME_LABELS[outcome.visual_outcome] || '-'} />
+          <InfoRow label="Discharge" value={DISCHARGE_STATUS_LABELS[outcome.discharge_status] || '-'} />
           {outcome.discharge_date && <InfoRow label="Discharge Date" value={format(new Date(outcome.discharge_date + 'T00:00:00'), 'dd MMM yyyy')} />}
           {outcome.notes && (
             <p style={{ fontSize: '.82rem', color: 'var(--gray-600)', marginTop: '.5rem', lineHeight: 1.6 }}>{outcome.notes}</p>
@@ -693,7 +693,7 @@ function ReferralSection({ babyId, babyHospitalId, canEdit }) {
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Referring To</label>
               <select className="form-control" value={form.to_hospital_id} onChange={e => setForm(p => ({ ...p, to_hospital_id: e.target.value }))}>
-                <option value="">— select hospital —</option>
+                <option value="">(select hospital)</option>
                 {hospitals.filter(h => h.id !== babyHospitalId).map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
               </select>
             </div>
