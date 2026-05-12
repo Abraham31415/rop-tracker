@@ -32,6 +32,12 @@ class BabyStatus(str, enum.Enum):
     TREATED = "treated"        # received treatment
 
 
+class DilationStatus(str, enum.Enum):
+    DILATED = "dilated"
+    NOT_DILATED = "not_dilated"
+    REFUSED = "dilation_refused"
+
+
 class Baby(Base):
     __tablename__ = "babies"
 
@@ -54,6 +60,12 @@ class Baby(Base):
     sepsis = Column(Boolean, default=False)
     inotropes = Column(Boolean, default=False)
     anaemia = Column(Boolean, default=False)
+    mechanical_ventilation = Column(Boolean, default=False)
+    surfactant_therapy = Column(Boolean, default=False)
+    apnoea = Column(Boolean, default=False)
+    nec = Column(Boolean, default=False)
+    twins_or_multiple = Column(Boolean, default=False)
+    phototherapy = Column(Boolean, default=False)
 
     # Parent / caregiver
     caregiver_name = Column(String, nullable=False)
@@ -65,6 +77,11 @@ class Baby(Base):
     status = Column(Enum(BabyStatus, values_callable=lambda x: [e.value for e in x]), default=BabyStatus.ACTIVE)
     notes = Column(Text, nullable=True)
 
+    # Dilation (set by NICU nurse before screening)
+    dilation_status = Column(Enum(DilationStatus, values_callable=lambda x: [e.value for e in x]), nullable=True)
+    dilation_updated_at = Column(DateTime(timezone=True), nullable=True)
+    dilation_updated_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
     enrolled_at = Column(DateTime(timezone=True), server_default=func.now())
     enrolled_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -75,3 +92,5 @@ class Baby(Base):
     reminders = relationship("Reminder", back_populates="baby")
     outcome = relationship("Outcome", back_populates="baby", uselist=False)
     referrals = relationship("Referral", back_populates="baby", order_by="Referral.referral_date.desc()")
+    contact_logs = relationship("ContactLog", back_populates="baby", order_by="ContactLog.created_at.desc()")
+    screening_requests = relationship("ScreeningRequest", back_populates="baby", order_by="ScreeningRequest.created_at.desc()")

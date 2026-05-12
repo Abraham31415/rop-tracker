@@ -161,15 +161,28 @@ function useBreadcrumbs(path) {
   return [{ label: 'Dashboard', to: '/dashboard' }]
 }
 
-// ── Notification count badge (all notification types) ─────────────────────────
-function useNotifCount(isCoordinator) {
-  const { data } = useQuery({
+// ── Notification count badge (coordinators: alerts; ophthalmologists: screening requests) ──
+function useNotifCount(role) {
+  const isCoordinator = role === 'hospital_coordinator' || role === 'central_coordinator'
+  const isOphthalm = role === 'ophthalmologist'
+
+  const { data: alertData } = useQuery({
     queryKey: ['alert-count'],
     queryFn: () => import('../services/api').then(m => m.getAlertCount()),
     enabled: isCoordinator,
     refetchInterval: 60_000,
   })
-  return data?.count ?? 0
+  const { data: screeningData } = useQuery({
+    queryKey: ['pending-screening-requests'],
+    queryFn: () => import('../services/api').then(m => m.getPendingScreeningRequests()),
+    enabled: isOphthalm,
+    refetchInterval: 30_000,
+    select: (d) => ({ count: Array.isArray(d) ? d.filter(r => r.status === 'pending').length : 0 }),
+  })
+
+  if (isCoordinator) return alertData?.count ?? 0
+  if (isOphthalm) return screeningData?.count ?? 0
+  return 0
 }
 
 // ── Bottom Navigation (mobile) ────────────────────────────────────────────────
@@ -232,7 +245,7 @@ export default function AppShell() {
   const [searchOpen, setSearchOpen] = useState(false)
 
   const isCoordinator = user?.role === 'hospital_coordinator' || user?.role === 'central_coordinator'
-  const alertCount = useNotifCount(isCoordinator)
+  const alertCount = useNotifCount(user?.role)
   const items = navItems(user?.role || '')
   const handleLogout = () => { logout(); navigate('/login') }
 
@@ -304,7 +317,7 @@ export default function AppShell() {
             <button className="alert-bell" onClick={() => setSearchOpen(true)} title="Search (Ctrl+K)">
               <IconSearch />
             </button>
-            {isCoordinator && (
+            {(isCoordinator || user?.role === 'ophthalmologist') && (
               <NavLink to="/notifications" className="alert-bell" title="Notifications">
                 <IconBell />
                 {alertCount > 0 && (

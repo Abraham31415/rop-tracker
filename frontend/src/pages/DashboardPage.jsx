@@ -1,18 +1,26 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { getDashboard, getAlerts, dismissAlert } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { format, differenceInDays } from 'date-fns'
+import NurseDashboard from './NurseDashboard'
+import OphthalmologistDashboard from './OphthalmologistDashboard'
 
-// ── Dummy data ────────────────────────────────────────────────────────────────
+// ── Dummy data (dates computed relative to today so the demo never goes stale) ─
+function _d(offsetDays) {
+  const d = new Date()
+  d.setDate(d.getDate() + offsetDays)
+  return d.toISOString().slice(0, 10)
+}
+
 const DUMMY_BABIES = [
-  { id: '1', full_name: 'Baby Nakamya A.', sex: 'female', date_of_birth: '2026-03-14', urgency: 'ltfu',      hospital_name: 'Mulago NRH',   next_due_date: '2026-04-29', days_until_due: -10, last_exam_date: '2026-04-15', last_zone: 'zone_ii',  last_stage: 'stage_2', gestational_age_weeks: 28, birth_weight_grams: 1150, caregiver_name: 'Prossy Nakamya',   mtn_phone: '+256772000001', airtel_phone: null },
-  { id: '2', full_name: 'Baby Otim B.',    sex: 'male',   date_of_birth: '2026-03-01', urgency: 'ltfu',      hospital_name: 'Mulago NRH',   next_due_date: '2026-05-01', days_until_due: -8,  last_exam_date: '2026-04-10', last_zone: 'zone_i',   last_stage: 'stage_1', gestational_age_weeks: 26, birth_weight_grams: 900,  caregiver_name: 'David Otim',       mtn_phone: '+256772000002', airtel_phone: null },
-  { id: '3', full_name: 'Baby Tumusiime C.',sex:'female', date_of_birth: '2026-03-20', urgency: 'due_today', hospital_name: 'Mulago NRH',   next_due_date: '2026-05-09', days_until_due: 0,   last_exam_date: '2026-04-25', last_zone: 'zone_ii',  last_stage: 'stage_1', gestational_age_weeks: 30, birth_weight_grams: 1380, caregiver_name: 'Rose Tumusiime',    mtn_phone: null,            airtel_phone: '+256752000003' },
-  { id: '4', full_name: 'Baby Okello D.',  sex: 'male',   date_of_birth: '2026-03-28', urgency: 'due_soon',  hospital_name: 'Mulago NRH',   next_due_date: '2026-05-11', days_until_due: 2,   last_exam_date: '2026-04-27', last_zone: 'zone_ii',  last_stage: 'stage_1', gestational_age_weeks: 29, birth_weight_grams: 1240, caregiver_name: 'Margaret Okello',  mtn_phone: '+256772000004', airtel_phone: null },
-  { id: '5', full_name: 'Baby Namukasa E.',sex:'female',  date_of_birth: '2026-04-04', urgency: 'due_soon',  hospital_name: 'Kiruddu GH',   next_due_date: '2026-05-10', days_until_due: 1,   last_exam_date: '2026-04-26', last_zone: 'zone_iii', last_stage: 'no_rop',  gestational_age_weeks: 32, birth_weight_grams: 1550, caregiver_name: 'Fatuma Namukasa',  mtn_phone: '+256772000005', airtel_phone: null },
-  { id: '6', full_name: 'Baby Ayebare F.', sex: 'female', date_of_birth: '2026-04-11', urgency: 'on_track',  hospital_name: 'Mulago NRH',   next_due_date: '2026-05-23', days_until_due: 14,  last_exam_date: '2026-04-25', last_zone: 'zone_iii', last_stage: 'no_rop',  gestational_age_weeks: 31, birth_weight_grams: 1420, caregiver_name: 'Alice Ayebare',    mtn_phone: null,            airtel_phone: '+256752000006' },
-  { id: '7', full_name: 'Baby Wanyama G.', sex: 'male',   date_of_birth: '2026-04-18', urgency: 'on_track',  hospital_name: 'Mbarara RRRH', next_due_date: '2026-05-30', days_until_due: 21,  last_exam_date: '2026-04-25', last_zone: 'zone_iii', last_stage: 'no_rop',  gestational_age_weeks: 33, birth_weight_grams: 1700, caregiver_name: 'Peter Wanyama',    mtn_phone: '+256772000007', airtel_phone: null },
+  { id: '1', full_name: 'Baby Nakamya A.',  sex: 'female', date_of_birth: _d(-56), urgency: 'ltfu',      hospital_name: 'Mulago NRH',   next_due_date: _d(-10), days_until_due: -10, last_exam_date: _d(-24), last_zone: 'zone_ii',  last_stage: 'stage_2', gestational_age_weeks: 28, birth_weight_grams: 1150, caregiver_name: 'Prossy Nakamya',  mtn_phone: '+256772000001', airtel_phone: null },
+  { id: '2', full_name: 'Baby Otim B.',     sex: 'male',   date_of_birth: _d(-69), urgency: 'ltfu',      hospital_name: 'Mulago NRH',   next_due_date: _d(-8),  days_until_due: -8,  last_exam_date: _d(-22), last_zone: 'zone_i',   last_stage: 'stage_1', gestational_age_weeks: 26, birth_weight_grams: 900,  caregiver_name: 'David Otim',      mtn_phone: '+256772000002', airtel_phone: null },
+  { id: '3', full_name: 'Baby Tumusiime C.', sex: 'female', date_of_birth: _d(-49), urgency: 'due_today', hospital_name: 'Mulago NRH',   next_due_date: _d(0),   days_until_due: 0,   last_exam_date: _d(-14), last_zone: 'zone_ii',  last_stage: 'stage_1', gestational_age_weeks: 30, birth_weight_grams: 1380, caregiver_name: 'Rose Tumusiime',   mtn_phone: null,            airtel_phone: '+256752000003' },
+  { id: '4', full_name: 'Baby Okello D.',   sex: 'male',   date_of_birth: _d(-42), urgency: 'due_soon',  hospital_name: 'Mulago NRH',   next_due_date: _d(2),   days_until_due: 2,   last_exam_date: _d(-12), last_zone: 'zone_ii',  last_stage: 'stage_1', gestational_age_weeks: 29, birth_weight_grams: 1240, caregiver_name: 'Margaret Okello', mtn_phone: '+256772000004', airtel_phone: null },
+  { id: '5', full_name: 'Baby Namukasa E.', sex: 'female', date_of_birth: _d(-35), urgency: 'due_soon',  hospital_name: 'Kiruddu GH',   next_due_date: _d(1),   days_until_due: 1,   last_exam_date: _d(-13), last_zone: 'zone_iii', last_stage: 'no_rop',  gestational_age_weeks: 32, birth_weight_grams: 1550, caregiver_name: 'Fatuma Namukasa', mtn_phone: '+256772000005', airtel_phone: null },
+  { id: '6', full_name: 'Baby Ayebare F.',  sex: 'female', date_of_birth: _d(-28), urgency: 'on_track',  hospital_name: 'Mulago NRH',   next_due_date: _d(14),  days_until_due: 14,  last_exam_date: _d(-14), last_zone: 'zone_iii', last_stage: 'no_rop',  gestational_age_weeks: 31, birth_weight_grams: 1420, caregiver_name: 'Alice Ayebare',   mtn_phone: null,            airtel_phone: '+256752000006' },
+  { id: '7', full_name: 'Baby Wanyama G.',  sex: 'male',   date_of_birth: _d(-21), urgency: 'on_track',  hospital_name: 'Mbarara RRRH', next_due_date: _d(21),  days_until_due: 21,  last_exam_date: _d(-7),  last_zone: 'zone_iii', last_stage: 'no_rop',  gestational_age_weeks: 33, birth_weight_grams: 1700, caregiver_name: 'Peter Wanyama',   mtn_phone: '+256772000007', airtel_phone: null },
 ]
 
 // ── Labels & helpers ──────────────────────────────────────────────────────────
@@ -53,6 +61,7 @@ function UrgencyCard({ value, label, type, icon }) {
 
 // ── Baby card ────────────────────────────────────────────────────────────────
 function BabyCard({ baby }) {
+  const navigate = useNavigate()
   const phone = baby.mtn_phone || baby.airtel_phone
   const network = baby.mtn_phone ? 'MTN' : baby.airtel_phone ? 'Airtel' : null
   const daysClass = dueDateClass(baby.days_until_due)
@@ -62,7 +71,14 @@ function BabyCard({ baby }) {
     : null
 
   return (
-    <div className={`baby-card ${baby.urgency}`}>
+    <div
+      className={`baby-card ${baby.urgency}`}
+      onClick={() => navigate(`/babies/${baby.id}`)}
+      style={{ cursor: 'pointer' }}
+      role="button"
+      tabIndex={0}
+      onKeyDown={e => e.key === 'Enter' && navigate(`/babies/${baby.id}`)}
+    >
       <div className="baby-card-header">
         <div>
           <div className="baby-card-name">{baby.full_name}</div>
@@ -111,9 +127,6 @@ function BabyCard({ baby }) {
           <strong>{baby.caregiver_name || '-'}</strong>
           {phone && <span>{network}: {phone}</span>}
         </div>
-        <Link to={`/babies/${baby.id}`} className="btn btn-secondary btn-sm" style={{ flexShrink: 0 }}>
-          View
-        </Link>
       </div>
     </div>
   )
@@ -183,9 +196,13 @@ function AlertPanel() {
   )
 }
 
-// ── Dashboard page ────────────────────────────────────────────────────────────
+// ── Dashboard page (role dispatcher) ─────────────────────────────────────────
 export default function DashboardPage() {
   const { user } = useAuth()
+
+  if (user?.role === 'nicu_nurse') return <NurseDashboard />
+  if (user?.role === 'ophthalmologist') return <OphthalmologistDashboard />
+  // hospital_coordinator and central_coordinator fall through to the full dashboard below
 
   const { data: babies, isLoading, error } = useQuery({
     queryKey: ['dashboard'],

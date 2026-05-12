@@ -23,6 +23,7 @@ from app.models.appointment import Appointment, AppointmentStatus
 from app.models.baby import Baby, BabyStatus
 from app.models.exam import Exam
 from app.models.reminder import Reminder, ReminderStatus, ReminderTrigger
+from app.models.screening_request import ScreeningRequest, ScreeningRequestStatus
 
 logger = logging.getLogger(__name__)
 
@@ -57,11 +58,18 @@ def _send_upcoming_reminders(days_before: int, trigger: str) -> None:
     db = SessionLocal()
     try:
         target_date = date.today() + timedelta(days=days_before)
+        # Exclude discharged and treated babies — their reminders should stop
+        active_baby_ids = (
+            db.query(Baby.id)
+            .filter(Baby.status.in_([BabyStatus.ACTIVE, BabyStatus.LTFU]))
+            .subquery()
+        )
         appointments = (
             db.query(Appointment)
             .filter(
                 Appointment.due_date == target_date,
                 Appointment.status == AppointmentStatus.SCHEDULED,
+                Appointment.baby_id.in_(active_baby_ids),
             )
             .all()
         )
@@ -185,6 +193,63 @@ def _mark_missed_and_ltfu() -> None:
         db.close()
 
 
+# ── Job 4: escalate unactioned screening requests at 24h ─────────────────────
+
+def _escalate_stale_screening_requests() -> None:
+    """
+    Screening requests that have been PENDING for 24h without being claimed
+    are escalated: status -> ESCALATED and a coordinator alert is created.
+    """
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(hours=24)
+
+        stale = (
+            db.query(ScreeningRequest)
+            .filter(
+                ScreeningRequest.status == ScreeningRequestStatus.PENDING,
+                ScreeningRequest.created_at <= cutoff,
+            )
+            .all()
+        )
+
+        for req in stale:
+            req.status = ScreeningRequestStatus.ESCALATED
+            req.escalated_at = now
+
+            baby = db.query(Baby).filter(Baby.id == req.baby_id).first()
+            if baby:
+                existing = db.query(Alert).filter(
+                    Alert.baby_id == baby.id,
+                    Alert.alert_type == AlertType.LTFU_FLAGGED,  # reuse closest type
+                    Alert.title.like("Screening request%"),
+                ).first()
+                if not existing:
+                    alert = Alert(
+                        hospital_id=req.hospital_id,
+                        baby_id=baby.id,
+                        alert_type=AlertType.LTFU_FLAGGED,
+                        title=f"Screening request unactioned: {baby.full_name}",
+                        body=(
+                            f"A screening request for {baby.full_name} was submitted over 24 hours ago "
+                            f"and has not been claimed by any ophthalmologist. "
+                            f"Please assign an ophthalmologist manually."
+                        ),
+                    )
+                    db.add(alert)
+
+        if stale:
+            db.commit()
+            logger.info("Escalated %d stale screening request(s)", len(stale))
+
+    except Exception:
+        logger.exception("Error in escalate_screening_requests job")
+        db.rollback()
+    finally:
+        db.close()
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def start_scheduler() -> None:
@@ -213,8 +278,16 @@ def start_scheduler() -> None:
         replace_existing=True,
         next_run_time=datetime.now(timezone.utc) + timedelta(minutes=20),
     )
+    _scheduler.add_job(
+        _escalate_stale_screening_requests,
+        trigger="interval",
+        hours=1,
+        id="escalate_screening_requests",
+        replace_existing=True,
+        next_run_time=datetime.now(timezone.utc) + timedelta(minutes=30),
+    )
     _scheduler.start()
-    logger.info("ROP reminder scheduler started (3 jobs)")
+    logger.info("ROP reminder scheduler started (4 jobs)")
 
 
 def stop_scheduler() -> None:

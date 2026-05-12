@@ -8,3 +8,5 @@ from app.models.reminder import Reminder
 from app.models.alert import Alert
 from app.models.outcome import Outcome
 from app.models.referral import Referral
+from app.models.contact_log import ContactLog
+from app.models.screening_request import ScreeningRequest

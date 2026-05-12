@@ -3,7 +3,7 @@ from uuid import UUID
 from datetime import date, datetime
 from pydantic import BaseModel
 from typing import Optional
-from app.models.baby import Sex, Language, BabyStatus
+from app.models.baby import Sex, Language, BabyStatus, DilationStatus
 
 
 class BabyCreate(BaseModel):
@@ -21,6 +21,12 @@ class BabyCreate(BaseModel):
     sepsis: bool = False
     inotropes: bool = False
     anaemia: bool = False
+    mechanical_ventilation: bool = False
+    surfactant_therapy: bool = False
+    apnoea: bool = False
+    nec: bool = False
+    twins_or_multiple: bool = False
+    phototherapy: bool = False
 
     # Caregiver
     caregiver_name: str
@@ -40,6 +46,10 @@ class BabyUpdate(BaseModel):
     notes: Optional[str] = None
 
 
+class DilationUpdate(BaseModel):
+    dilation_status: DilationStatus
+
+
 class BabyOut(BaseModel):
     id: UUID
     hospital_id: UUID
@@ -54,6 +64,12 @@ class BabyOut(BaseModel):
     sepsis: bool
     inotropes: bool
     anaemia: bool
+    mechanical_ventilation: bool
+    surfactant_therapy: bool
+    apnoea: bool
+    nec: bool
+    twins_or_multiple: bool
+    phototherapy: bool
     caregiver_name: str
     mtn_phone: Optional[str]
     airtel_phone: Optional[str]
@@ -61,6 +77,8 @@ class BabyOut(BaseModel):
     status: BabyStatus
     notes: Optional[str]
     enrolled_at: datetime
+    dilation_status: Optional[DilationStatus] = None
+    dilation_updated_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 
