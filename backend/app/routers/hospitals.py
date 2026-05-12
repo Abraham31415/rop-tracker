@@ -29,7 +29,10 @@ class HospitalOut(BaseModel):
 
 
 @router.get("/", response_model=list[HospitalOut])
-def list_hospitals(db: Session = Depends(get_db)):
+def list_hospitals(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
     return db.query(Hospital).filter(Hospital.is_active == True).all()
 
 
