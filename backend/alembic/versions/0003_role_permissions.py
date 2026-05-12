@@ -26,24 +26,33 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # ── New enum types (must be outside transaction in PG) ────────────────────
-    op.execute("CREATE TYPE dilation_status AS ENUM ('dilated', 'not_dilated', 'dilation_refused')")
-    op.execute("CREATE TYPE contact_log_type AS ENUM ('sms', 'phone_call', 'caregiver_edit', 'screening_request', 'note')")
-    op.execute("CREATE TYPE screening_request_status AS ENUM ('pending', 'claimed', 'completed', 'escalated')")
+    # ── New enum types (idempotent via DO block) ───────────────────────────────
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE dilation_status AS ENUM ('dilated', 'not_dilated', 'dilation_refused');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE contact_log_type AS ENUM ('sms', 'phone_call', 'caregiver_edit', 'screening_request', 'note');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE screening_request_status AS ENUM ('pending', 'claimed', 'completed', 'escalated');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
+    """)
 
-    # ── Dilation columns on babies ────────────────────────────────────────────
-    op.add_column("babies", sa.Column(
-        "dilation_status",
-        postgresql.ENUM(name="dilation_status", create_type=False),
-        nullable=True,
-    ))
-    op.add_column("babies", sa.Column("dilation_updated_at", sa.DateTime(timezone=True), nullable=True))
-    op.add_column("babies", sa.Column(
-        "dilation_updated_by_id",
-        postgresql.UUID(as_uuid=True),
-        sa.ForeignKey("users.id"),
-        nullable=True,
-    ))
+    # ── Dilation columns on babies (IF NOT EXISTS) ────────────────────────────
+    op.execute("""
+        ALTER TABLE babies
+            ADD COLUMN IF NOT EXISTS dilation_status dilation_status,
+            ADD COLUMN IF NOT EXISTS dilation_updated_at TIMESTAMPTZ,
+            ADD COLUMN IF NOT EXISTS dilation_updated_by_id UUID REFERENCES users(id)
+    """)
 
     # ── contact_logs table ────────────────────────────────────────────────────
     op.create_table(
@@ -57,8 +66,9 @@ def upgrade() -> None:
         sa.Column("field_name", sa.String(), nullable=True),
         sa.Column("old_value", sa.String(), nullable=True),
         sa.Column("new_value", sa.String(), nullable=True),
+        if_not_exists=True,
     )
-    op.create_index("ix_contact_logs_baby_id", "contact_logs", ["baby_id"])
+    op.create_index("ix_contact_logs_baby_id", "contact_logs", ["baby_id"], if_not_exists=True)
 
     # ── screening_requests table ──────────────────────────────────────────────
     op.create_table(
@@ -74,9 +84,10 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("claimed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("escalated_at", sa.DateTime(timezone=True), nullable=True),
+        if_not_exists=True,
     )
-    op.create_index("ix_screening_requests_baby_id", "screening_requests", ["baby_id"])
-    op.create_index("ix_screening_requests_hospital_id", "screening_requests", ["hospital_id"])
+    op.create_index("ix_screening_requests_baby_id", "screening_requests", ["baby_id"], if_not_exists=True)
+    op.create_index("ix_screening_requests_hospital_id", "screening_requests", ["hospital_id"], if_not_exists=True)
 
 
 def downgrade() -> None:
