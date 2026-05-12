@@ -17,7 +17,7 @@ import AppointmentsPage from './pages/AppointmentsPage'
 import NotFoundPage from './pages/NotFoundPage'
 
 const COORDINATORS = ['hospital_coordinator', 'central_coordinator']
-const ENROLLERS    = ['nicu_nurse', 'hospital_coordinator', 'central_coordinator']
+const ENROLLERS    = ['nicu_nurse', 'ophthalmologist', 'hospital_coordinator', 'central_coordinator']
 const OPHTHALM_UP  = ['ophthalmologist', 'hospital_coordinator', 'central_coordinator']
 
 function PrivateRoute({ children }) {
