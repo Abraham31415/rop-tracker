@@ -7,10 +7,15 @@ import {
 } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 
+// Used in the "Add Staff" form dropdown — CC accounts are created in /admin
 const ROLE_LABELS = {
   nicu_nurse: 'NICU Nurse',
   ophthalmologist: 'Ophthalmologist',
   hospital_coordinator: 'Hospital Coordinator',
+}
+// Used for display only (table rows may include CC accounts)
+const ROLE_DISPLAY_LABELS = {
+  ...ROLE_LABELS,
   central_coordinator: 'Central Coordinator',
 }
 const TRIGGER_LABELS = {
@@ -108,7 +113,7 @@ function UsersTab() {
                 <tr key={u.id} style={{ opacity: u.is_active ? 1 : 0.5 }}>
                   <td style={{ fontWeight: 500 }}>{u.full_name}</td>
                   <td style={{ fontSize: '.83rem', color: 'var(--gray-500)' }}>{u.email}</td>
-                  <td><span style={{ fontSize: '.78rem' }}>{ROLE_LABELS[u.role] || u.role}</span></td>
+                  <td><span style={{ fontSize: '.78rem' }}>{ROLE_DISPLAY_LABELS[u.role] || u.role}</span></td>
                   <td style={{ fontSize: '.83rem' }}>{u.hospital_name || '-'}</td>
                   <td>
                     <span className={`badge ${u.is_active ? 'badge-on_track' : 'badge-ltfu'}`} style={{ fontSize: '.72rem' }}>

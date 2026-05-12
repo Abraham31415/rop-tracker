@@ -10,3 +10,4 @@ from app.models.outcome import Outcome
 from app.models.referral import Referral
 from app.models.contact_log import ContactLog
 from app.models.screening_request import ScreeningRequest
+from app.models.audit_log import AuditLog

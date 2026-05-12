@@ -21,7 +21,20 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:3000)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:5173)",
       "Bash(pkill -f \"vite.js\")",
-      "Bash(\"C:\\\\Program Files\\\\nodejs\\\\node.exe\" \"C:\\\\Program Files\\\\nodejs\\\\node_modules\\\\npm\\\\bin\\\\npm-cli.js\" install canvg)"
+      "Bash(\"C:\\\\Program Files\\\\nodejs\\\\node.exe\" \"C:\\\\Program Files\\\\nodejs\\\\node_modules\\\\npm\\\\bin\\\\npm-cli.js\" install canvg)",
+      "Bash(gh --version)",
+      "Bash(git --version)",
+      "Bash(winget install *)",
+      "Bash(Get-ChildItem -Force)",
+      "Bash(Select-Object Name, Mode)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(python -m pytest tests/test_analytics.py -v)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(pip install *)",
+      "Bash(python -m pytest tests/test_security.py -v)",
+      "Bash(python -m pytest -v --tb=short)"
     ]
   }
 }

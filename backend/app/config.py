@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     WHATSAPP_API_URL: str = ""
     WHATSAPP_TOKEN: str = ""
 
+    ADMIN_EMAIL: str = "admin@roptracker.ug"
+    ADMIN_PASSWORD: str = "change-me-in-production"
+    ADMIN_SECRET_KEY: str = ""
+
     class Config:
         env_file = ".env"
 

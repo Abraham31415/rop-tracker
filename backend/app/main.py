@@ -12,11 +12,12 @@ from slowapi.middleware import SlowAPIMiddleware
 
 import app.models  # noqa: F401 — registers all ORM models with Base
 
-from app.routers import auth, babies, exams, hospitals, reminders, network, alerts, notifications, reports, users, templates, outcomes, referrals, appointments, contact_logs, screening_requests, analytics
+from app.routers import auth, babies, exams, hospitals, reminders, network, alerts, notifications, reports, users, templates, outcomes, referrals, appointments, contact_logs, screening_requests, analytics, admin
 from app.services.scheduler import start_scheduler, stop_scheduler
 
-# Paths that do not require a JWT (login + health check only)
-_PUBLIC_PATHS = {"/api/auth/login", "/api/health"}
+# Paths that do not require a clinical JWT (admin routes have their own auth)
+_PUBLIC_PATHS = {"/api/auth/login", "/api/health", "/api/admin/login"}
+_ADMIN_PATH_PREFIX = "/api/admin/"
 
 
 def _run_migrations() -> None:
@@ -52,7 +53,11 @@ app.add_middleware(SlowAPIMiddleware)
 @app.middleware("http")
 async def require_auth(request: Request, call_next):
     """Reject requests to protected API paths that carry no valid JWT."""
-    if request.url.path not in _PUBLIC_PATHS and request.url.path.startswith("/api/"):
+    if (
+        request.url.path not in _PUBLIC_PATHS
+        and request.url.path.startswith("/api/")
+        and not request.url.path.startswith(_ADMIN_PATH_PREFIX)
+    ):
         auth_header = request.headers.get("Authorization", "")
         if not auth_header.startswith("Bearer "):
             return JSONResponse({"detail": "Not authenticated"}, status_code=401)
@@ -94,6 +99,7 @@ app.include_router(appointments.router)
 app.include_router(contact_logs.router)
 app.include_router(screening_requests.router)
 app.include_router(analytics.router)
+app.include_router(admin.router)
 
 
 @app.get("/api/health")
