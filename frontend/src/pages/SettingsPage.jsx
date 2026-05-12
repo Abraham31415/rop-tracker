@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   listUsers, createUser, deactivateUser, activateUser,
   listHospitals, getTemplates, updateTemplate, resetTemplate,
+  getGatewayStatus, sendTestSms,
 } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -267,6 +268,183 @@ function TemplatesTab() {
   )
 }
 
+// ── SMS Gateway tab ──────────────────────────────────────────────────────────
+function GatewayTab() {
+  const qc = useQueryClient()
+  const [testPhone, setTestPhone] = useState('')
+  const [testResult, setTestResult] = useState(null)
+
+  const { data: status, isLoading, error, refetch, isFetching } = useQuery({
+    queryKey: ['gateway-status'],
+    queryFn: getGatewayStatus,
+    staleTime: 30_000,
+  })
+
+  const testMut = useMutation({
+    mutationFn: () => sendTestSms(testPhone.trim()),
+    onSuccess: (data) => {
+      setTestResult(data)
+      qc.invalidateQueries({ queryKey: ['gateway-status'] })
+    },
+    onError: (e) => {
+      setTestResult({ success: false, error: e.response?.data?.detail || e.message })
+    },
+  })
+
+  const isLive = status?.mode === 'live'
+
+  function StatRow({ label, value, accent }) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '.45rem 0', borderBottom: '1px solid var(--gray-100)' }}>
+        <span style={{ fontSize: '.8rem', color: 'var(--gray-500)', fontWeight: 600 }}>{label}</span>
+        <span style={{ fontSize: '.85rem', fontWeight: 700, color: accent || 'var(--gray-800)' }}>{value}</span>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+      {/* Status panel */}
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+          <div>
+            <div style={{ fontSize: '.68rem', fontWeight: 700, color: 'var(--teal-600)', textTransform: 'uppercase', letterSpacing: '.09em', marginBottom: '.35rem' }}>
+              Gateway Status
+            </div>
+            {isLoading && <div style={{ fontSize: '.85rem', color: 'var(--gray-400)' }}>Loading...</div>}
+            {!isLoading && status && (
+              <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{
+                  padding: '.3rem .85rem', borderRadius: 999, fontSize: '.82rem', fontWeight: 800,
+                  background: isLive ? 'var(--green-100)' : 'var(--gray-100)',
+                  color: isLive ? 'var(--green-700)' : 'var(--gray-500)',
+                }}>
+                  {isLive ? 'Live' : 'Simulation Mode'}
+                </span>
+                <span style={{
+                  padding: '.3rem .85rem', borderRadius: 999, fontSize: '.82rem', fontWeight: 700,
+                  background: status.configured ? '#eff6ff' : '#fef3c7',
+                  color: status.configured ? '#1d4ed8' : '#92400e',
+                }}>
+                  {status.configured ? 'Credentials set' : 'No API key'}
+                </span>
+              </div>
+            )}
+          </div>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            style={{ flexShrink: 0 }}
+          >
+            {isFetching ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
+
+        {error && (
+          <div className="alert alert-error" style={{ fontSize: '.82rem', padding: '.4rem .65rem' }}>
+            Failed to load gateway status.
+          </div>
+        )}
+
+        {status && (
+          <>
+            <StatRow label="AT Username"   value={status.username || '-'} />
+            <StatRow label="Sender ID"     value={status.sender_id || '(default)'} />
+            <StatRow
+              label="Sent (last 24h)"
+              value={status.stats_24h.sent}
+              accent={status.stats_24h.sent > 0 ? 'var(--green-700)' : undefined}
+            />
+            <StatRow
+              label="Failed (last 24h)"
+              value={status.stats_24h.failed}
+              accent={status.stats_24h.failed > 0 ? 'var(--red-700)' : undefined}
+            />
+            <StatRow
+              label="Last sent"
+              value={status.last_sent_at
+                ? new Date(status.last_sent_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
+                : 'Never'}
+            />
+            <StatRow
+              label="Last failure"
+              value={status.last_failed_at
+                ? new Date(status.last_failed_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
+                : 'None'}
+            />
+          </>
+        )}
+
+        {!isLoading && status?.mode === 'simulate' && (
+          <div style={{
+            marginTop: '1rem', padding: '.65rem .9rem',
+            background: '#fef3c7', borderRadius: 'var(--radius-sm)', border: '1px solid #fcd34d',
+            fontSize: '.82rem', color: '#92400e', lineHeight: 1.5,
+          }}>
+            <strong>Simulation mode is on.</strong> The scheduler creates Reminder records and
+            logs messages, but no SMS is sent. Set <code>AT_SIMULATE=False</code> in your
+            environment variables to enable live sending.
+          </div>
+        )}
+      </div>
+
+      {/* Test SMS panel */}
+      <div className="card">
+        <div style={{ fontSize: '.68rem', fontWeight: 700, color: 'var(--teal-600)', textTransform: 'uppercase', letterSpacing: '.09em', marginBottom: '.75rem' }}>
+          Send Test SMS
+        </div>
+        <p style={{ fontSize: '.83rem', color: 'var(--gray-500)', marginBottom: '1rem', lineHeight: 1.5 }}>
+          Sends a live test message via Africa's Talking, bypassing simulation mode.
+          Use this to verify your credentials and confirm the gateway is reachable.
+        </p>
+        <div style={{ display: 'flex', gap: '.6rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div className="form-group" style={{ margin: 0, flex: 1, minWidth: 200 }}>
+            <label className="form-label">Phone number (E.164 format)</label>
+            <input
+              type="tel"
+              className="form-control"
+              placeholder="+256772000001"
+              value={testPhone}
+              onChange={e => { setTestPhone(e.target.value); setTestResult(null) }}
+            />
+          </div>
+          <button
+            className="btn btn-primary"
+            onClick={() => testMut.mutate()}
+            disabled={!testPhone.trim() || testMut.isPending}
+            style={{ flexShrink: 0 }}
+          >
+            {testMut.isPending ? 'Sending...' : 'Send Test'}
+          </button>
+        </div>
+
+        {testResult && (
+          <div style={{
+            marginTop: '.9rem', padding: '.65rem .9rem', borderRadius: 'var(--radius-sm)', border: '1px solid',
+            borderColor: testResult.success ? '#86efac' : '#fca5a5',
+            background: testResult.success ? 'var(--green-50)' : '#fef2f2',
+            fontSize: '.83rem', lineHeight: 1.5,
+          }}>
+            {testResult.success ? (
+              <div style={{ color: 'var(--green-700)' }}>
+                <strong>Sent successfully.</strong>
+                {testResult.message_id && <> Message ID: <code>{testResult.message_id}</code>.</>}
+                {testResult.cost && <> Cost: {testResult.cost}.</>}
+              </div>
+            ) : (
+              <div style={{ color: 'var(--red-700)' }}>
+                <strong>Failed.</strong> {testResult.error}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Main Settings page ───────────────────────────────────────────────────────
 export default function SettingsPage() {
   const { user } = useAuth()
@@ -274,9 +452,10 @@ export default function SettingsPage() {
   const [tab, setTab] = useState('users')
 
   const tabs = [
-    { key: 'users', label: 'Staff Accounts' },
+    { key: 'users',     label: 'Staff Accounts' },
     ...(isCentral ? [{ key: 'hospitals', label: 'Hospitals' }] : []),
     { key: 'templates', label: 'SMS Templates' },
+    { key: 'gateway',   label: 'SMS Gateway' },
   ]
 
   return (
@@ -284,7 +463,7 @@ export default function SettingsPage() {
       <div className="page-header">
         <div className="page-header-text">
           <h2>Settings</h2>
-          <p>Manage staff, hospitals, and SMS message templates</p>
+          <p>Manage staff, hospitals, SMS templates, and gateway configuration</p>
         </div>
       </div>
 
@@ -304,6 +483,7 @@ export default function SettingsPage() {
         {tab === 'users'     && <UsersTab />}
         {tab === 'hospitals' && <HospitalsTab />}
         {tab === 'templates' && <TemplatesTab />}
+        {tab === 'gateway'   && <GatewayTab />}
       </div>
     </div>
   )

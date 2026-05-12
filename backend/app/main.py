@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
 import app.models  # register all ORM models before create_all
 
-from app.routers import auth, babies, exams, hospitals, reminders, network, alerts, notifications, reports, users, templates, outcomes, referrals
+from app.routers import auth, babies, exams, hospitals, reminders, network, alerts, notifications, reports, users, templates, outcomes, referrals, appointments
 from app.services.scheduler import start_scheduler, stop_scheduler
 
 Base.metadata.create_all(bind=engine)
@@ -126,6 +126,7 @@ app.include_router(users.router)
 app.include_router(templates.router)
 app.include_router(outcomes.router)
 app.include_router(referrals.router)
+app.include_router(appointments.router)
 
 
 @app.get("/api/health")

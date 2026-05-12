@@ -42,9 +42,9 @@ const TREATMENT_LABELS = { laser: 'Laser Photocoagulation', bevacizumab: 'Intrav
 const VF_FIXATION_LABELS   = { central: 'Central', eccentric: 'Eccentric', none_unable: 'None / Unable' }
 const VF_FOLLOWING_LABELS  = { follows_smoothly: 'Follows smoothly', follows_partially: 'Follows partially', does_not_follow: 'Does not follow', unable_to_assess: 'Unable to assess' }
 const VF_CSM_LABELS        = { csm: 'CSM', cs: 'CS (not maintained)', c: 'C (not steady)', not_central: 'Not central (N)', unable_to_assess: 'Unable to assess' }
-const VF_NYSTAGMUS_LABELS  = { absent: 'Absent', pendular: 'Present — Pendular', jerk: 'Present — Jerk', latent: 'Present — Latent' }
+const VF_NYSTAGMUS_LABELS  = { absent: 'Absent', pendular: 'Present (Pendular)', jerk: 'Present (Jerk)', latent: 'Present (Latent)' }
 const VF_STRABISMUS_LABELS = { absent: 'Absent', esotropia: 'Esotropia', exotropia: 'Exotropia', suspected: 'Suspected (orthoptic review needed)' }
-const VF_IMPRESSION_LABELS = { age_appropriate: 'Age-appropriate visual function', mildly_delayed: 'Mildly delayed — monitor', significantly_delayed: 'Significantly delayed — refer for low vision', unable_to_assess: 'Unable to assess this visit' }
+const VF_IMPRESSION_LABELS = { age_appropriate: 'Age-appropriate visual function', mildly_delayed: 'Mildly delayed (monitor)', significantly_delayed: 'Significantly delayed (refer for low vision)', unable_to_assess: 'Unable to assess this visit' }
 
 function hasVFData(exam) {
   return !!(exam.vf_right_fixation || exam.vf_left_fixation || exam.vf_right_following ||
@@ -57,15 +57,15 @@ function addVFSection(doc, exam, yStart) {
 
   const rows = []
   if (exam.vf_right_fixation || exam.vf_left_fixation)
-    rows.push(['Fixation', VF_FIXATION_LABELS[exam.vf_right_fixation] || '—', VF_FIXATION_LABELS[exam.vf_left_fixation] || '—'])
+    rows.push(['Fixation', VF_FIXATION_LABELS[exam.vf_right_fixation] || '-', VF_FIXATION_LABELS[exam.vf_left_fixation] || '-'])
   if (exam.vf_right_following || exam.vf_left_following)
-    rows.push(['Following', VF_FOLLOWING_LABELS[exam.vf_right_following] || '—', VF_FOLLOWING_LABELS[exam.vf_left_following] || '—'])
+    rows.push(['Following', VF_FOLLOWING_LABELS[exam.vf_right_following] || '-', VF_FOLLOWING_LABELS[exam.vf_left_following] || '-'])
   if (exam.vf_right_csm || exam.vf_left_csm)
-    rows.push(['CSM', VF_CSM_LABELS[exam.vf_right_csm] || '—', VF_CSM_LABELS[exam.vf_left_csm] || '—'])
+    rows.push(['CSM', VF_CSM_LABELS[exam.vf_right_csm] || '-', VF_CSM_LABELS[exam.vf_left_csm] || '-'])
   if (exam.vf_right_teller_acuity != null || exam.vf_left_teller_acuity != null)
-    rows.push(['Teller Acuity (c/d)', exam.vf_right_teller_acuity != null ? String(exam.vf_right_teller_acuity) : '—', exam.vf_left_teller_acuity != null ? String(exam.vf_left_teller_acuity) : '—'])
+    rows.push(['Teller Acuity (c/d)', exam.vf_right_teller_acuity != null ? String(exam.vf_right_teller_acuity) : '-', exam.vf_left_teller_acuity != null ? String(exam.vf_left_teller_acuity) : '-'])
   if (exam.vf_right_vep != null || exam.vf_left_vep != null)
-    rows.push(['VEP (LogMAR)', exam.vf_right_vep != null ? String(exam.vf_right_vep) : '—', exam.vf_left_vep != null ? String(exam.vf_left_vep) : '—'])
+    rows.push(['VEP (LogMAR)', exam.vf_right_vep != null ? String(exam.vf_right_vep) : '-', exam.vf_left_vep != null ? String(exam.vf_left_vep) : '-'])
 
   if (rows.length > 0) {
     autoTable(doc, {
@@ -148,7 +148,7 @@ function addFooter(doc, pageNum, totalPages) {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(7.5)
   doc.text('ROP Tracker Uganda', ML, y + 2)
-  doc.text('CONFIDENTIAL — For clinical use only', PW / 2, y + 2, { align: 'center' })
+  doc.text('CONFIDENTIAL: For clinical use only', PW / 2, y + 2, { align: 'center' })
   doc.text(`Page ${pageNum} of ${totalPages}`, PW - MR, y + 2, { align: 'right' })
 }
 
@@ -349,7 +349,7 @@ export async function generatePopulationPDF(report) {
   y = doc.lastAutoTable.finalY + 8
 
   // ── LTFU analysis ──
-  y = sectionHeading(doc, y, 'LTFU Analysis — Missed Appointments')
+  y = sectionHeading(doc, y, 'LTFU Analysis: Missed Appointments')
   autoTable(doc, {
     startY: y,
     margin: { left: ML, right: MR },
@@ -395,7 +395,7 @@ export async function generatePopulationPDF(report) {
   // Monthly trend
   if (monthly_trend.length > 0) {
     if (y > 220) { doc.addPage(); addPageHeader(doc, hospital_name, periodStr); y = 20 }
-    y = sectionHeading(doc, y, 'Monthly Trend — Enrollments & Exams')
+    y = sectionHeading(doc, y, 'Monthly Trend: Enrollments and Exams')
     autoTable(doc, {
       startY: y,
       margin: { left: ML, right: MR },
@@ -511,7 +511,7 @@ export async function generateSingleVisitPDF(baby, exam, hospitalName) {
   y += 10
 
   // ── Exam details ──
-  y = sectionHeading(doc, y, `Examination — ${fmtDate(exam.exam_date)}`)
+  y = sectionHeading(doc, y, `Examination: ${fmtDate(exam.exam_date)}`)
 
   // Two eye boxes side by side
   const eyeW = (CW - 6) / 2
@@ -641,7 +641,7 @@ export async function generateBabyFullPDF(baby, exams, hospitalName) {
   doc.text('ROP Tracker Uganda', ML, 16)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9.5)
-  doc.text('Complete Clinical Record — All Examinations', ML, 23)
+  doc.text('Complete Clinical Record: All Examinations', ML, 23)
   doc.text(hospitalName || '', ML, 30)
 
   if (qr) {
@@ -738,13 +738,13 @@ export async function generateBabyFullPDF(baby, exams, hospitalName) {
     y = sectionHeading(doc, y, 'Visual Function Trajectory')
     const vfRows = [...vfExams].reverse().map(e => [
       fmtDate(e.exam_date),
-      VF_FIXATION_LABELS[e.vf_right_fixation] || '—',
-      VF_FOLLOWING_LABELS[e.vf_right_following] || '—',
-      VF_CSM_LABELS[e.vf_right_csm] || '—',
-      VF_FIXATION_LABELS[e.vf_left_fixation] || '—',
-      VF_FOLLOWING_LABELS[e.vf_left_following] || '—',
-      VF_CSM_LABELS[e.vf_left_csm] || '—',
-      VF_IMPRESSION_LABELS[e.vf_functional_impression] || '—',
+      VF_FIXATION_LABELS[e.vf_right_fixation] || '-',
+      VF_FOLLOWING_LABELS[e.vf_right_following] || '-',
+      VF_CSM_LABELS[e.vf_right_csm] || '-',
+      VF_FIXATION_LABELS[e.vf_left_fixation] || '-',
+      VF_FOLLOWING_LABELS[e.vf_left_following] || '-',
+      VF_CSM_LABELS[e.vf_left_csm] || '-',
+      VF_IMPRESSION_LABELS[e.vf_functional_impression] || '-',
     ])
     autoTable(doc, {
       startY: y,
@@ -795,7 +795,7 @@ export async function generateBabyFullPDF(baby, exams, hospitalName) {
     setTxt(doc, C.gray900)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(13)
-    doc.text(`Examination — ${fmtDate(exam.exam_date)}`, ML + 6, ey + 9)
+    doc.text(`Examination: ${fmtDate(exam.exam_date)}`, ML + 6, ey + 9)
 
     const worstLabel = exam.worst_zone
       ? `${ZONE_LABELS[exam.worst_zone] || exam.worst_zone} / ${STAGE_LABELS[exam.worst_stage] || '-'}${exam.has_plus_disease === 'yes' ? ' + Plus Disease' : ''}`

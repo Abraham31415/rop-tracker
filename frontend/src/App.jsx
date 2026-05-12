@@ -12,6 +12,7 @@ import SearchPage from './pages/SearchPage'
 import NotificationsPage from './pages/NotificationsPage'
 import ReportsPage from './pages/ReportsPage'
 import SettingsPage from './pages/SettingsPage'
+import AppointmentsPage from './pages/AppointmentsPage'
 import NotFoundPage from './pages/NotFoundPage'
 
 function PrivateRoute({ children }) {
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="search"        element={<SearchPage />} />
           <Route path="enroll"        element={<EnrollBabyPage />} />
           <Route path="network"       element={<NetworkDashboardPage />} />
+          <Route path="appointments"  element={<AppointmentsPage />} />
           <Route path="notifications" element={<NotificationsPage />} />
           <Route path="reports"       element={<ReportsPage />} />
           <Route path="settings"      element={<SettingsPage />} />

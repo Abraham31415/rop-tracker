@@ -65,6 +65,14 @@ export const downloadResearchCSV = (params) => api.get('/api/reports/research-ex
 export const getOutcome = (babyId) => api.get(`/api/outcomes/${babyId}`).then(r => r.data)
 export const upsertOutcome = (babyId, data) => api.put(`/api/outcomes/${babyId}`, data).then(r => r.data)
 
+// ── Appointments ──────────────────────────────────────────────────────────────
+export const listAppointments = (babyId) => api.get(`/api/appointments/baby/${babyId}`).then(r => r.data)
+export const listAllAppointments = (params) => api.get('/api/appointments/', { params }).then(r => r.data)
+export const markAppointmentAttended = (appointmentId, notes) =>
+  api.patch(`/api/appointments/${appointmentId}/attend`, { notes: notes || null }).then(r => r.data)
+export const rescheduleAppointment = (appointmentId, newDate, notes) =>
+  api.patch(`/api/appointments/${appointmentId}/reschedule`, { new_date: newDate, notes: notes || null }).then(r => r.data)
+
 // ── Referrals ─────────────────────────────────────────────────────────────────
 export const listReferrals = (babyId) => api.get(`/api/referrals/baby/${babyId}`).then(r => r.data)
 export const createReferral = (babyId, data) => api.post(`/api/referrals/baby/${babyId}`, data).then(r => r.data)
@@ -75,6 +83,10 @@ export const listUsers = () => api.get('/api/users/').then(r => r.data)
 export const createUser = (data) => api.post('/api/users/', data).then(r => r.data)
 export const deactivateUser = (id) => api.patch(`/api/users/${id}/deactivate`).then(r => r.data)
 export const activateUser = (id) => api.patch(`/api/users/${id}/activate`).then(r => r.data)
+
+// ── SMS Gateway ───────────────────────────────────────────────────────────────
+export const getGatewayStatus = () => api.get('/api/reminders/gateway-status').then(r => r.data)
+export const sendTestSms = (phone) => api.post('/api/reminders/test-sms', null, { params: { phone } }).then(r => r.data)
 
 // ── SMS Templates ─────────────────────────────────────────────────────────────
 export const getTemplates = () => api.get('/api/templates/').then(r => r.data)

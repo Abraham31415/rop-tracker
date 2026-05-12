@@ -194,6 +194,67 @@ def log_phone_call(
     return _serialize_reminder(reminder)
 
 
+# ── Gateway status ───────────────────────────────────────────────────────────
+
+@router.get("/gateway-status")
+def gateway_status(
+    db: Session = Depends(get_db),
+    user: User = Depends(_require_coordinator),
+):
+    """Return AT gateway configuration and 24-hour delivery stats."""
+    from datetime import timedelta
+    from app.config import settings
+
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(hours=24)
+
+    base = db.query(Reminder).filter(
+        Reminder.reminder_type == ReminderType.SMS,
+        Reminder.created_at >= since,
+    )
+    sent_24h   = base.filter(Reminder.status == ReminderStatus.SENT).count()
+    failed_24h = base.filter(Reminder.status == ReminderStatus.FAILED).count()
+
+    last_sent = (
+        db.query(Reminder)
+        .filter(Reminder.reminder_type == ReminderType.SMS, Reminder.status == ReminderStatus.SENT)
+        .order_by(Reminder.sent_at.desc())
+        .first()
+    )
+    last_failed = (
+        db.query(Reminder)
+        .filter(Reminder.reminder_type == ReminderType.SMS, Reminder.status == ReminderStatus.FAILED)
+        .order_by(Reminder.created_at.desc())
+        .first()
+    )
+
+    return {
+        "mode": "simulate" if settings.AT_SIMULATE else "live",
+        "configured": bool(settings.AT_API_KEY),
+        "username": settings.AT_USERNAME,
+        "sender_id": settings.AT_SENDER_ID or None,
+        "stats_24h": {"sent": sent_24h, "failed": failed_24h},
+        "last_sent_at": last_sent.sent_at.isoformat() if last_sent and last_sent.sent_at else None,
+        "last_failed_at": last_failed.created_at.isoformat() if last_failed else None,
+    }
+
+
+# ── Test SMS ─────────────────────────────────────────────────────────────────
+
+@router.post("/test-sms")
+def send_test_sms(
+    phone: str = Query(..., description="E.164 phone number, e.g. +256772000001"),
+    user: User = Depends(_require_coordinator),
+):
+    """
+    Send a live test SMS via Africa's Talking, bypassing simulation mode.
+    Use this to verify AT credentials are correct and the gateway is reachable.
+    """
+    from app.services.messaging import test_gateway
+    result = test_gateway(phone)
+    return result
+
+
 # ── Preview message ──────────────────────────────────────────────────────────
 
 @router.get("/preview/{baby_id}")

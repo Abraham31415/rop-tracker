@@ -248,7 +248,7 @@ function OutcomesTab({ isCentral }) {
         <StatCard value={outcomes.blindness_prevented} label="Blindness Prevented" accent="var(--teal-600)" sub="Babies receiving active treatment" />
         <StatCard value={outcomes.referrals.total} label="Total Referrals" />
         <StatCard
-          value={outcomes.referrals.total ? `${outcomes.referrals.success_rate}%` : '—'}
+          value={outcomes.referrals.total ? `${outcomes.referrals.success_rate}%` : '-'}
           label="Referral Success Rate"
           sub="Arrived & treated"
           accent={outcomes.referrals.success_rate >= 70 ? 'var(--green-600)' : 'var(--amber-600)'}

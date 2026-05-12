@@ -39,12 +39,12 @@ const PLUS_LABELS  = { none: 'None', pre_plus: 'Pre-Plus', plus: 'Plus' }
 const VF_FIXATION_OPTS   = [['central', 'Central'], ['eccentric', 'Eccentric'], ['none_unable', 'None / Unable']]
 const VF_FOLLOWING_OPTS  = [['follows_smoothly', 'Follows smoothly'], ['follows_partially', 'Follows partially'], ['does_not_follow', 'Does not follow'], ['unable_to_assess', 'Unable to assess']]
 const VF_CSM_OPTS        = [['csm', 'CSM'], ['cs', 'CS (not maintained)'], ['c', 'C (not steady)'], ['not_central', 'Not central (N)'], ['unable_to_assess', 'Unable']]
-const VF_NYSTAGMUS_OPTS  = [['absent', 'Absent'], ['pendular', 'Present — Pendular'], ['jerk', 'Present — Jerk'], ['latent', 'Present — Latent']]
-const VF_STRABISMUS_OPTS = [['absent', 'Absent'], ['esotropia', 'Esotropia'], ['exotropia', 'Exotropia'], ['suspected', 'Suspected — needs orthoptic review']]
+const VF_NYSTAGMUS_OPTS  = [['absent', 'Absent'], ['pendular', 'Present (Pendular)'], ['jerk', 'Present (Jerk)'], ['latent', 'Present (Latent)']]
+const VF_STRABISMUS_OPTS = [['absent', 'Absent'], ['esotropia', 'Esotropia'], ['exotropia', 'Exotropia'], ['suspected', 'Suspected (needs orthoptic review)']]
 const VF_IMPRESSION_OPTS = [
   ['age_appropriate', 'Age-appropriate visual function'],
-  ['mildly_delayed', 'Mildly delayed — monitor'],
-  ['significantly_delayed', 'Significantly delayed — refer for low vision assessment'],
+  ['mildly_delayed', 'Mildly delayed (monitor)'],
+  ['significantly_delayed', 'Significantly delayed (refer for low vision assessment)'],
   ['unable_to_assess', 'Unable to assess this visit'],
 ]
 
@@ -168,7 +168,7 @@ function VFEyePanel({ side, vf, setVf }) {
           <div className="form-group" style={{ margin: 0 }}>
             <label className="form-label" style={{ fontSize: '.7rem' }}>
               VEP (LogMAR)
-              <span title="Visual Evoked Potential — objective cortical acuity measure" style={{ marginLeft: '.3rem', cursor: 'help', color: 'var(--gray-400)' }}>ⓘ</span>
+              <span title="Visual Evoked Potential: objective cortical acuity measure" style={{ marginLeft: '.3rem', cursor: 'help', color: 'var(--gray-400)' }}>ⓘ</span>
             </label>
             <input type="number" step="0.01" placeholder="e.g. 0.3"
               value={vf[p + '_vep']}
@@ -207,7 +207,7 @@ function VisualFunctionSection({ vf, setVf, previousExams }) {
           Add Visual Function Assessment (optional)
         </button>
         <p style={{ fontSize: '.75rem', color: 'var(--gray-400)', margin: '.4rem 0 0 1.6rem' }}>
-          Functional vision — appropriate for neonates and infants.
+          Functional vision, appropriate for neonates and infants.
         </p>
       </div>
     )
@@ -221,7 +221,7 @@ function VisualFunctionSection({ vf, setVf, previousExams }) {
             Visual Function Assessment
           </div>
           <div style={{ fontSize: '.75rem', color: 'var(--gray-500)', marginTop: '.15rem' }}>
-            Functional vision — appropriate for neonates and infants. All fields optional.
+            Functional vision, appropriate for neonates and infants. All fields optional.
           </div>
         </div>
         <button type="button" onClick={() => setExpanded(false)}
@@ -257,7 +257,7 @@ function VisualFunctionSection({ vf, setVf, previousExams }) {
         <div className="form-group">
           <label className="form-label">Overall Functional Impression</label>
           <select value={vf.functional_impression} onChange={e => setVf(prev => ({ ...prev, functional_impression: e.target.value }))}>
-            <option value="">— select —</option>
+            <option value="">Select...</option>
             {VF_IMPRESSION_OPTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         </div>

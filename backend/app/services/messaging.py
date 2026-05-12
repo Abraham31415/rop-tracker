@@ -167,6 +167,39 @@ def send_sms(phone: str, message: str) -> dict:
         return {"success": False, "error": str(exc)}
 
 
+def test_gateway(phone: str) -> dict:
+    """
+    Send a live test SMS via Africa's Talking, always bypassing AT_SIMULATE.
+    Used by the Settings gateway-status page to verify credentials work.
+    """
+    if not settings.AT_API_KEY:
+        return {"success": False, "simulated": False, "error": "AT_API_KEY is not set in environment"}
+    message = (
+        "ROP Tracker test message from Uganda ROP Network. "
+        "Gateway is working correctly. Please ignore."
+    )
+    try:
+        import africastalking
+        africastalking.initialize(settings.AT_USERNAME, settings.AT_API_KEY)
+        response = africastalking.SMS.send(message, [phone], settings.AT_SENDER_ID or None)
+        recipients = response.get("SMSMessageData", {}).get("Recipients", [])
+        if recipients:
+            r = recipients[0]
+            ok = r.get("status") == "Success"
+            return {
+                "success": ok,
+                "simulated": False,
+                "message_id": r.get("messageId"),
+                "cost": r.get("cost"),
+                "status": r.get("status"),
+                "error": None if ok else f"AT status: {r.get('status')}",
+            }
+        return {"success": False, "simulated": False, "error": "Empty recipients in AT response"}
+    except Exception as exc:
+        logger.error("Gateway test failed: %s", exc)
+        return {"success": False, "simulated": False, "error": str(exc)}
+
+
 def dispatch_reminder(db: "Session", appointment: "Appointment", trigger: str) -> "Reminder":  # noqa: F821
     """
     Full pipeline: pick phone → render message → send via AT → persist Reminder row.

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getBaby, listExams, listReminders, logPhoneCall, listHospitals, getOutcome, upsertOutcome, listReferrals, createReferral, updateReferralStatus } from '../services/api'
+import { getBaby, listExams, listReminders, logPhoneCall, listHospitals, getOutcome, upsertOutcome, listReferrals, createReferral, updateReferralStatus, listAppointments, markAppointmentAttended, updateBaby } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { format, formatDistanceToNow } from 'date-fns'
 import { generateBabyFullPDF, generateSingleVisitPDF } from '../services/pdfExport'
@@ -39,8 +39,8 @@ const VF_NYSTAGMUS_LABELS = { absent: 'Absent', pendular: 'Pendular', jerk: 'Jer
 const VF_STRABISMUS_LABELS = { absent: 'Absent', esotropia: 'Esotropia', exotropia: 'Exotropia', suspected: 'Suspected' }
 const VF_IMPRESSION_LABELS = {
   age_appropriate: 'Age-appropriate',
-  mildly_delayed: 'Mildly delayed — monitor',
-  significantly_delayed: 'Significantly delayed — refer',
+  mildly_delayed: 'Mildly delayed (monitor)',
+  significantly_delayed: 'Significantly delayed (refer)',
   unable_to_assess: 'Unable to assess',
 }
 
@@ -421,8 +421,8 @@ const VISUAL_OUTCOME_LABELS = {
   ltfu_before_outcome: 'LTFU Before Assessment',
 }
 const DISCHARGE_STATUS_LABELS = {
-  completed_no_rop: 'Completed — No ROP',
-  completed_treated: 'Completed — Treated Successfully',
+  completed_no_rop: 'Completed: No ROP',
+  completed_treated: 'Completed: Treated Successfully',
   referred_national: 'Referred Nationally',
   referred_abroad: 'Referred Abroad',
   died: 'Died',
@@ -496,14 +496,14 @@ function VisualFunctionTab({ exams }) {
                   <td style={{ padding: '.55rem .9rem', fontWeight: 700, color: 'var(--gray-800)', whiteSpace: 'nowrap' }}>
                     {format(new Date(exam.exam_date + 'T00:00:00'), 'dd MMM yyyy')}
                   </td>
-                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FIXATION_LABELS[exam.vf_right_fixation] || '—'}</td>
-                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FOLLOWING_LABELS[exam.vf_right_following] || '—'}</td>
-                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_CSM_LABELS[exam.vf_right_csm] || '—'}</td>
-                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FIXATION_LABELS[exam.vf_left_fixation] || '—'}</td>
-                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FOLLOWING_LABELS[exam.vf_left_following] || '—'}</td>
-                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_CSM_LABELS[exam.vf_left_csm] || '—'}</td>
+                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FIXATION_LABELS[exam.vf_right_fixation] || '-'}</td>
+                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FOLLOWING_LABELS[exam.vf_right_following] || '-'}</td>
+                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_CSM_LABELS[exam.vf_right_csm] || '-'}</td>
+                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FIXATION_LABELS[exam.vf_left_fixation] || '-'}</td>
+                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_FOLLOWING_LABELS[exam.vf_left_following] || '-'}</td>
+                  <td style={{ padding: '.55rem .9rem', color: 'var(--gray-700)' }}>{VF_CSM_LABELS[exam.vf_left_csm] || '-'}</td>
                   <td style={{ padding: '.55rem .9rem', color: 'var(--teal-700)', fontWeight: 600, fontSize: '.75rem' }}>
-                    {VF_IMPRESSION_LABELS[exam.vf_functional_impression] || '—'}
+                    {VF_IMPRESSION_LABELS[exam.vf_functional_impression] || '-'}
                   </td>
                 </tr>
               ))}
@@ -592,7 +592,7 @@ function OutcomeSection({ babyId, canEdit }) {
           <div className="form-group">
             <label className="form-label">Treatment Type</label>
             <select className="form-control" {...field('treatment_type')}>
-              <option value="">— select —</option>
+              <option value="">Select...</option>
               {Object.entries(TREATMENT_TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </div>
@@ -600,7 +600,7 @@ function OutcomeSection({ babyId, canEdit }) {
             <div className="form-group">
               <label className="form-label">Eye Treated</label>
               <select className="form-control" {...field('treatment_eye')}>
-                <option value="">— select —</option>
+                <option value="">Select...</option>
                 {Object.entries(TREATMENT_EYE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
@@ -612,7 +612,7 @@ function OutcomeSection({ babyId, canEdit }) {
           <div className="form-group">
             <label className="form-label">Treatment Hospital</label>
             <select className="form-control" {...field('treatment_hospital_id')}>
-              <option value="">— same hospital —</option>
+              <option value="">Same hospital</option>
               {hospitals.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
             </select>
           </div>
@@ -624,14 +624,14 @@ function OutcomeSection({ babyId, canEdit }) {
             <div className="form-group">
               <label className="form-label">Visual Outcome</label>
               <select className="form-control" {...field('visual_outcome')}>
-                <option value="">— select —</option>
+                <option value="">Select...</option>
                 {Object.entries(VISUAL_OUTCOME_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
             <div className="form-group">
               <label className="form-label">Discharge Status</label>
               <select className="form-control" {...field('discharge_status')}>
-                <option value="">— select —</option>
+                <option value="">Select...</option>
                 {Object.entries(DISCHARGE_STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
@@ -672,17 +672,17 @@ function OutcomeSection({ babyId, canEdit }) {
       </div>
       {outcome ? (
         <>
-          <InfoRow label="Treatment" value={TREATMENT_TYPE_LABELS[outcome.treatment_type] || '—'} />
+          <InfoRow label="Treatment" value={TREATMENT_TYPE_LABELS[outcome.treatment_type] || '-'} />
           {outcome.treatment_type && outcome.treatment_type !== 'none' && (
             <>
-              <InfoRow label="Eye" value={TREATMENT_EYE_LABELS[outcome.treatment_eye] || '—'} />
-              <InfoRow label="Treat. Date" value={outcome.treatment_date ? format(new Date(outcome.treatment_date + 'T00:00:00'), 'dd MMM yyyy') : '—'} />
+              <InfoRow label="Eye" value={TREATMENT_EYE_LABELS[outcome.treatment_eye] || '-'} />
+              <InfoRow label="Treat. Date" value={outcome.treatment_date ? format(new Date(outcome.treatment_date + 'T00:00:00'), 'dd MMM yyyy') : '-'} />
               {outcome.treatment_hospital_name && <InfoRow label="Treat. Hospital" value={outcome.treatment_hospital_name} />}
               {outcome.treating_ophthalmologist && <InfoRow label="Ophthalmologist" value={outcome.treating_ophthalmologist} />}
             </>
           )}
-          <InfoRow label="Visual Outcome" value={VISUAL_OUTCOME_LABELS[outcome.visual_outcome] || '—'} />
-          <InfoRow label="Discharge" value={DISCHARGE_STATUS_LABELS[outcome.discharge_status] || '—'} />
+          <InfoRow label="Visual Outcome" value={VISUAL_OUTCOME_LABELS[outcome.visual_outcome] || '-'} />
+          <InfoRow label="Discharge" value={DISCHARGE_STATUS_LABELS[outcome.discharge_status] || '-'} />
           {outcome.discharge_date && <InfoRow label="Discharge Date" value={format(new Date(outcome.discharge_date + 'T00:00:00'), 'dd MMM yyyy')} />}
           {outcome.notes && (
             <p style={{ fontSize: '.82rem', color: 'var(--gray-600)', marginTop: '.5rem', lineHeight: 1.6 }}>{outcome.notes}</p>
@@ -754,7 +754,7 @@ function ReferralSection({ babyId, babyHospitalId, canEdit }) {
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Referring To</label>
               <select className="form-control" value={form.to_hospital_id} onChange={e => setForm(p => ({ ...p, to_hospital_id: e.target.value }))}>
-                <option value="">— select hospital —</option>
+                <option value="">Select hospital</option>
                 {hospitals.filter(h => h.id !== babyHospitalId).map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
               </select>
             </div>
@@ -824,6 +824,312 @@ function ReferralSection({ babyId, babyHospitalId, canEdit }) {
         )
       })}
     </div>
+  )
+}
+
+// ── Caregiver & Contact edit card ────────────────────────────────────────────
+function CaregiverCard({ baby }) {
+  const qc = useQueryClient()
+  const [editing, setEditing] = useState(false)
+  const [form, setForm] = useState(null)
+
+  const startEdit = () => {
+    setForm({
+      caregiver_name: baby.caregiver_name || '',
+      mtn_phone:      baby.mtn_phone      || '',
+      airtel_phone:   baby.airtel_phone   || '',
+      language_preference: baby.language_preference || 'english',
+      notes: baby.notes || '',
+    })
+    setEditing(true)
+  }
+
+  const mutation = useMutation({
+    mutationFn: (data) => updateBaby(baby.id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['baby', String(baby.id)] })
+      setEditing(false)
+    },
+  })
+
+  const handleSave = () => {
+    const payload = { ...form }
+    if (!payload.mtn_phone)    payload.mtn_phone    = null
+    if (!payload.airtel_phone) payload.airtel_phone = null
+    if (!payload.notes)        payload.notes        = null
+    mutation.mutate(payload)
+  }
+
+  const f = (k) => ({ value: form[k], onChange: e => setForm(p => ({ ...p, [k]: e.target.value })) })
+
+  const phone = baby.mtn_phone || baby.airtel_phone
+
+  if (editing && form) {
+    return (
+      <div className="card">
+        <SectionHeading>Caregiver &amp; Contact</SectionHeading>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '.7rem' }}>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label">Caregiver Name</label>
+            <input type="text" className="form-control" placeholder="Full name" {...f('caregiver_name')} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.6rem' }}>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">MTN Phone</label>
+              <input type="tel" className="form-control" placeholder="+256 77..." {...f('mtn_phone')} />
+            </div>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">Airtel Phone</label>
+              <input type="tel" className="form-control" placeholder="+256 75..." {...f('airtel_phone')} />
+            </div>
+          </div>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label">Language Preference</label>
+            <select className="form-control" {...f('language_preference')}>
+              <option value="english">English</option>
+              <option value="luganda">Luganda</option>
+              <option value="runyankole">Runyankole</option>
+              <option value="acholi">Acholi</option>
+              <option value="ateso">Ateso</option>
+            </select>
+          </div>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label">Notes <span style={{ fontWeight: 400, color: 'var(--gray-400)' }}>(optional)</span></label>
+            <textarea className="form-control" rows={2} style={{ resize: 'vertical' }} placeholder="Any relevant context about this baby or caregiver..." {...f('notes')} />
+          </div>
+          {mutation.error && (
+            <div className="alert alert-error" style={{ fontSize: '.8rem', padding: '.4rem .65rem' }}>
+              {mutation.error.response?.data?.detail || 'Failed to save changes.'}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'flex-end' }}>
+            <button className="btn btn-secondary btn-sm" onClick={() => setEditing(false)} disabled={mutation.isPending}>
+              Cancel
+            </button>
+            <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={mutation.isPending || !form.caregiver_name.trim()}>
+              {mutation.isPending ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="card">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '.75rem' }}>
+        <SectionHeading>Caregiver &amp; Contact</SectionHeading>
+        <button className="btn btn-secondary btn-sm" style={{ marginTop: '-.15rem' }} onClick={startEdit}>
+          Edit
+        </button>
+      </div>
+      <InfoRow label="Name"     value={baby.caregiver_name} />
+      <InfoRow label="MTN"      value={baby.mtn_phone} />
+      <InfoRow label="Airtel"   value={baby.airtel_phone} />
+      <InfoRow label="Language" value={LANG_MAP[baby.language_preference] || baby.language_preference} />
+      {baby.notes && (
+        <p style={{ fontSize: '.85rem', color: 'var(--gray-600)', lineHeight: 1.6, marginTop: '.6rem', paddingTop: '.6rem', borderTop: '1px solid var(--gray-100)' }}>
+          {baby.notes}
+        </p>
+      )}
+      {phone && (
+        <div style={{ marginTop: '.75rem', display: 'flex', gap: '.5rem' }}>
+          <a href={`tel:${phone}`} className="btn btn-secondary btn-sm" style={{ flex: 1, justifyContent: 'center' }}>
+            Call
+          </a>
+          <a
+            href={`https://wa.me/${phone.replace(/\D/g, '')}`}
+            target="_blank"
+            rel="noreferrer"
+            className="btn btn-secondary btn-sm"
+            style={{ flex: 1, justifyContent: 'center' }}
+          >
+            WhatsApp
+          </a>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Attend confirmation dialog ────────────────────────────────────────────────
+function AttendDialog({ appointment, babyName, onConfirm, onCancel, isPending }) {
+  const [notes, setNotes] = useState('')
+  const dueLabel = format(new Date(appointment.due_date + 'T00:00:00'), 'dd MMMM yyyy')
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1000,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(0,0,0,0.35)',
+      padding: '1rem',
+    }}>
+      <div style={{
+        background: 'var(--white)', borderRadius: 'var(--radius)', boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+        padding: '1.5rem', maxWidth: 420, width: '100%',
+      }}>
+        <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--gray-900)', marginBottom: '.5rem' }}>
+          Confirm Attendance
+        </div>
+        <p style={{ fontSize: '.9rem', color: 'var(--gray-700)', marginBottom: '1rem', lineHeight: 1.5 }}>
+          Confirm attendance for <strong>{babyName}</strong> on <strong>{dueLabel}</strong>?
+        </p>
+        <div className="form-group" style={{ marginBottom: '1rem' }}>
+          <label className="form-label" style={{ marginBottom: '.3rem' }}>
+            Notes <span style={{ fontWeight: 400, color: 'var(--gray-400)' }}>(optional)</span>
+          </label>
+          <textarea
+            rows={2}
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            placeholder="e.g. Caregiver arrived late, rescheduled next visit…"
+            style={{ resize: 'vertical', fontSize: '.85rem', width: '100%' }}
+            className="form-control"
+          />
+        </div>
+        <div style={{ display: 'flex', gap: '.6rem', justifyContent: 'flex-end' }}>
+          <button className="btn btn-secondary btn-sm" onClick={onCancel} disabled={isPending}>
+            Cancel
+          </button>
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={() => onConfirm(notes)}
+            disabled={isPending}
+          >
+            {isPending ? 'Saving…' : 'Confirm'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const APPT_STATUS_STYLE = {
+  scheduled:  { bg: '#eff6ff', color: '#1d4ed8', label: 'Scheduled' },
+  attended:   { bg: 'var(--green-100)', color: 'var(--green-700)', label: 'Attended' },
+  missed:     { bg: '#fff7ed', color: '#c2410c', label: 'Missed' },
+  ltfu:       { bg: 'var(--red-100)', color: 'var(--red-700)', label: 'LTFU' },
+}
+
+function AppointmentsSection({ babyId, babyName, canMarkAttended }) {
+  const qc = useQueryClient()
+  const [dialogAppt, setDialogAppt] = useState(null)
+
+  const { data: appointments = [], isLoading } = useQuery({
+    queryKey: ['appointments', babyId],
+    queryFn: () => listAppointments(babyId),
+  })
+
+  const mutation = useMutation({
+    mutationFn: ({ id, notes }) => markAppointmentAttended(id, notes),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['appointments', babyId] })
+      qc.invalidateQueries({ queryKey: ['baby', babyId] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.invalidateQueries({ queryKey: ['alerts'] })
+      qc.invalidateQueries({ queryKey: ['alert-count'] })
+      setDialogAppt(null)
+    },
+  })
+
+  const actionable = appointments.filter(a => a.status === 'scheduled' || a.status === 'missed')
+  // Show up to 5 most recent appointments as history
+  const history = appointments.slice(0, 5)
+
+  return (
+    <>
+      {dialogAppt && (
+        <AttendDialog
+          appointment={dialogAppt}
+          babyName={babyName}
+          isPending={mutation.isPending}
+          onConfirm={(notes) => mutation.mutate({ id: dialogAppt.id, notes })}
+          onCancel={() => setDialogAppt(null)}
+        />
+      )}
+
+      <div className="card">
+        <SectionHeading>Appointments</SectionHeading>
+
+        {isLoading && (
+          <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--gray-400)', fontSize: '.85rem' }}>
+            Loading…
+          </div>
+        )}
+
+        {/* Actionable appointments — needs attention */}
+        {canMarkAttended && actionable.length > 0 && (
+          <div style={{ marginBottom: history.length > actionable.length ? '1rem' : 0 }}>
+            {actionable.map(appt => {
+              const st = APPT_STATUS_STYLE[appt.status] || APPT_STATUS_STYLE.scheduled
+              const due = format(new Date(appt.due_date + 'T00:00:00'), 'dd MMM yyyy')
+              const daysAgo = Math.round((Date.now() - new Date(appt.due_date + 'T00:00:00')) / 86400000)
+              return (
+                <div key={appt.id} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  gap: '.75rem', padding: '.6rem .75rem', marginBottom: '.4rem',
+                  borderRadius: 'var(--radius-sm)', border: `1.5px solid ${st.bg === '#fff7ed' ? '#fed7aa' : '#bfdbfe'}`,
+                  background: st.bg, flexWrap: 'wrap',
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '.85rem', color: 'var(--gray-900)' }}>{due}</div>
+                    <div style={{ fontSize: '.73rem', color: st.color, fontWeight: 600, marginTop: '.1rem' }}>
+                      {st.label}{daysAgo > 0 ? ` · ${daysAgo}d overdue` : daysAgo === 0 ? ' · Today' : ''}
+                    </div>
+                  </div>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => setDialogAppt(appt)}
+                    style={{ flexShrink: 0 }}
+                  >
+                    Mark Attended
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Recent appointment history */}
+        {!isLoading && history.length === 0 && (
+          <p style={{ fontSize: '.83rem', color: 'var(--gray-400)', textAlign: 'center', padding: '.5rem 0' }}>
+            No appointments scheduled yet.
+          </p>
+        )}
+
+        {history.length > 0 && (
+          <div>
+            {history.map(appt => {
+              const st = APPT_STATUS_STYLE[appt.status] || APPT_STATUS_STYLE.scheduled
+              const due = format(new Date(appt.due_date + 'T00:00:00'), 'dd MMM yyyy')
+              const isActionable = appt.status === 'scheduled' || appt.status === 'missed'
+              if (canMarkAttended && isActionable) return null  // already shown above
+              return (
+                <div key={appt.id} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '.4rem 0', borderBottom: '1px solid var(--gray-100)', gap: '.5rem',
+                }}>
+                  <span style={{ fontSize: '.83rem', color: 'var(--gray-700)', fontWeight: 600 }}>{due}</span>
+                  <span style={{
+                    padding: '.15rem .55rem', borderRadius: 999,
+                    fontSize: '.7rem', fontWeight: 700,
+                    background: st.bg, color: st.color,
+                  }}>
+                    {st.label}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {mutation.error && (
+          <div className="alert alert-error" style={{ fontSize: '.8rem', padding: '.4rem .65rem', marginTop: '.75rem' }}>
+            {mutation.error.response?.data?.detail || 'Failed to mark attendance.'}
+          </div>
+        )}
+      </div>
+    </>
   )
 }
 
@@ -1009,34 +1315,15 @@ export default function BabyDetailPage() {
         {/* RIGHT: contact + clinical info */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
+          {/* Appointments */}
+          <AppointmentsSection
+            babyId={id}
+            babyName={baby.full_name}
+            canMarkAttended={isCoordinator || canRecordExam}
+          />
+
           {/* Contact details */}
-          <div className="card">
-            <SectionHeading>Caregiver &amp; Contact</SectionHeading>
-            <InfoRow label="Name"     value={baby.caregiver_name} />
-            <InfoRow label="MTN"      value={baby.mtn_phone} />
-            <InfoRow label="Airtel"   value={baby.airtel_phone} />
-            <InfoRow label="Language" value={LANG_MAP[baby.language_preference] || baby.language_preference} />
-            {phone && (
-              <div style={{ marginTop: '.75rem', display: 'flex', gap: '.5rem' }}>
-                <a
-                  href={`tel:${phone}`}
-                  className="btn btn-secondary btn-sm"
-                  style={{ flex: 1, justifyContent: 'center' }}
-                >
-                  ☎ Call
-                </a>
-                <a
-                  href={`https://wa.me/${phone.replace(/\D/g,'')}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn btn-secondary btn-sm"
-                  style={{ flex: 1, justifyContent: 'center' }}
-                >
-                  WhatsApp
-                </a>
-              </div>
-            )}
-          </div>
+          <CaregiverCard baby={baby} />
 
           {/* Birth / clinical info */}
           <div className="card">
@@ -1069,14 +1356,6 @@ export default function BabyDetailPage() {
 
           {/* Referrals */}
           <ReferralSection babyId={id} babyHospitalId={baby.hospital_id} canEdit={canRecordExam || isCoordinator} />
-
-          {/* Notes */}
-          {baby.notes && (
-            <div className="card">
-              <SectionHeading>Clinical Notes</SectionHeading>
-              <p style={{ fontSize: '.88rem', color: 'var(--gray-700)', lineHeight: 1.7 }}>{baby.notes}</p>
-            </div>
-          )}
 
           {/* Reminder summary */}
           {reminders.length > 0 && (
