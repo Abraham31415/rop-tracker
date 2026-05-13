@@ -125,6 +125,7 @@ export default function LoginPage() {
                 placeholder="you@hospital.ug"
                 required
                 autoFocus
+                autoComplete="email"
               />
             </div>
             <div className="form-group" style={{ marginBottom: '1.5rem' }}>
@@ -136,6 +137,7 @@ export default function LoginPage() {
                 onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
+                autoComplete="current-password"
               />
             </div>
             <button

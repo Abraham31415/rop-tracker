@@ -26,7 +26,7 @@ class ScreeningRequest(Base):
     claimed_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
     status = Column(
-        Enum(ScreeningRequestStatus, values_callable=lambda x: [e.value for e in x]),
+        Enum(ScreeningRequestStatus, values_callable=lambda x: [e.name for e in x]),
         default=ScreeningRequestStatus.PENDING,
         nullable=False,
     )

@@ -21,7 +21,9 @@ import AnalyticsPage from './pages/AnalyticsPage'
 import AdminLoginPage from './pages/admin/AdminLoginPage'
 import AdminDashboardPage from './pages/admin/AdminDashboardPage'
 import AdminCoordinatorsPage from './pages/admin/AdminCoordinatorsPage'
+import AdminHospitalsPage from './pages/admin/AdminHospitalsPage'
 import AdminAuditPage from './pages/admin/AdminAuditPage'
+import AdminHealthPage from './pages/admin/AdminHealthPage'
 
 const COORDINATORS = ['hospital_coordinator', 'central_coordinator']
 const ENROLLERS    = ['nicu_nurse', 'ophthalmologist', 'hospital_coordinator', 'central_coordinator']
@@ -99,6 +101,8 @@ export default function App() {
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="dashboard"    element={<AdminDashboardPage />} />
           <Route path="coordinators" element={<AdminCoordinatorsPage />} />
+          <Route path="hospitals"    element={<AdminHospitalsPage />} />
+          <Route path="health"       element={<AdminHealthPage />} />
           <Route path="audit"        element={<AdminAuditPage />} />
         </Route>
 

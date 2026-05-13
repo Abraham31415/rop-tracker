@@ -101,5 +101,6 @@ class BabyDashboardItem(BaseModel):
     caregiver_name: str
     mtn_phone: Optional[str]
     airtel_phone: Optional[str]
+    sms_failed_recently: bool = False
 
     model_config = {"from_attributes": True}

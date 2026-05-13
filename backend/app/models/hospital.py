@@ -15,6 +15,9 @@ class Hospital(Base):
     name = Column(String, nullable=False, unique=True)
     district = Column(String, nullable=False)
     region = Column(String, nullable=False)
+    hospital_type = Column(String, nullable=True)
+    physical_address = Column(String, nullable=True)
+    contact_phone = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

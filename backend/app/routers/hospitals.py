@@ -8,6 +8,7 @@ from app.database import get_db
 from app.models.hospital import Hospital
 from app.models.user import User, UserRole
 from app.auth.jwt import get_current_user
+from app.utils.audit import write_audit
 
 router = APIRouter(prefix="/api/hospitals", tags=["hospitals"])
 
@@ -46,6 +47,17 @@ def create_hospital(
         raise HTTPException(status_code=403, detail="Only central coordinators can add hospitals")
     hospital = Hospital(**data.model_dump())
     db.add(hospital)
+    db.flush()
+    write_audit(
+        db,
+        user_id=current_user.id,
+        user_name=current_user.full_name,
+        user_role=current_user.role.value,
+        action_type="CREATE",
+        entity_type="Hospital",
+        entity_id=str(hospital.id),
+        details={"name": hospital.name, "district": hospital.district, "region": hospital.region},
+    )
     db.commit()
     db.refresh(hospital)
     return hospital

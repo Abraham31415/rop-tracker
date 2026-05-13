@@ -1,10 +1,25 @@
 import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getBaby, listExams, listReminders, logPhoneCall, listHospitals, getOutcome, upsertOutcome, listReferrals, createReferral, updateReferralStatus, updateBaby, getContactLogs, addContactNote, updateDilation, dischargeBaby, reactivateBaby } from '../services/api'
+import { getBaby, listExams, listReminders, logPhoneCall, listHospitals, getOutcome, upsertOutcome, listReferrals, createReferral, updateReferralStatus, updateBaby, getContactLogs, addContactNote, updateDilation, dischargeBaby, reactivateBaby, retrySMS } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { format, formatDistanceToNow } from 'date-fns'
 import { generateBabyFullPDF, generateSingleVisitPDF } from '../services/pdfExport'
+
+// ── SMS error → human-readable message ───────────────────────────────────────
+function mapSmsError(raw) {
+  if (!raw) return 'SMS delivery failed — please contact parent directly'
+  const e = raw.toLowerCase()
+  if (/ssl|connection error|econnrefused|network|connect timed out/.test(e))
+    return 'Could not reach SMS provider — network issue'
+  if (/invalid.*phone|phone.*invalid|invalid destination|not a valid|unreachable/.test(e))
+    return 'Phone number is invalid or unreachable'
+  if (/balance|credit|insufficient|low funds/.test(e))
+    return 'SMS not sent — account balance too low'
+  if (/timeout|timed out/.test(e))
+    return 'SMS provider did not respond — will retry'
+  return 'SMS delivery failed — please contact parent directly'
+}
 
 // ── Labels ────────────────────────────────────────────────────────────────────
 const ZONE_LABELS  = { zone_i: 'Zone I', zone_ii: 'Zone II', zone_iii: 'Zone III' }
@@ -1056,11 +1071,27 @@ function DilationPanel({ babyId, baby, canEdit }) {
 }
 
 // ── Unified contact log (reminders + contact_logs merged) ─────────────────────
-function UnifiedContactLog({ babyId, reminders, canAddNote }) {
+function UnifiedContactLog({ babyId, reminders, canAddNote, canRetry, onCallClick }) {
   const qc = useQueryClient()
   const [showNoteForm, setShowNoteForm] = useState(false)
   const [noteText, setNoteText] = useState('')
   const [showMsg, setShowMsg] = useState({})
+  const [showError, setShowError] = useState({})
+  const [retryingId, setRetryingId] = useState(null)
+
+  async function handleRetry(reminderId) {
+    setRetryingId(reminderId)
+    try {
+      await retrySMS(reminderId)
+      qc.invalidateQueries({ queryKey: ['reminders', babyId] })
+    } catch (_) {}
+    setRetryingId(null)
+  }
+
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  const recentFailCount = reminders.filter(
+    r => r.status === 'failed' && new Date(r.created_at) >= sevenDaysAgo
+  ).length
 
   const { data: contactLogs = [] } = useQuery({
     queryKey: ['contact-logs', babyId],
@@ -1108,6 +1139,18 @@ function UnifiedContactLog({ babyId, reminders, canAddNote }) {
           <div style={{ fontSize: '.9rem', fontWeight: 700, color: 'var(--gray-900)', marginTop: '-.3rem' }}>
             All reminders, calls &amp; edits
           </div>
+          {recentFailCount > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', marginTop: '.3rem', fontSize: '.78rem', color: '#92400E' }}>
+              <span>⚠</span>
+              <span>
+                {recentFailCount} SMS failed recently —{' '}
+                {onCallClick
+                  ? <button onClick={onCallClick} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2563EB', fontWeight: 600, padding: 0, fontSize: 'inherit', textDecoration: 'underline' }}>call the parent directly</button>
+                  : 'consider calling the parent directly'
+                }
+              </span>
+            </div>
+          )}
         </div>
         {canAddNote && (
           <button className="btn btn-secondary btn-sm" onClick={() => setShowNoteForm(p => !p)}>
@@ -1176,8 +1219,41 @@ function UnifiedContactLog({ babyId, reminders, canAddNote }) {
                       </button>
                     </>
                   )}
-                  {r.error_message && (
-                    <div style={{ fontSize: '.72rem', color: 'var(--red-600)', marginTop: '.2rem' }}>Error: {r.error_message}</div>
+                  {r.status === 'failed' && (
+                    <div style={{ marginTop: '.35rem' }}>
+                      <div style={{ fontSize: '.78rem', color: 'var(--red-700)', marginBottom: '.3rem' }}>
+                        {mapSmsError(r.error_message)}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', flexWrap: 'wrap' }}>
+                        {canRetry && (
+                          <button
+                            onClick={() => handleRetry(r.id)}
+                            disabled={retryingId === r.id}
+                            style={{
+                              background: 'var(--amber-50)', border: '1px solid var(--amber-300)',
+                              color: 'var(--amber-800)', borderRadius: 'var(--radius-sm)',
+                              fontSize: '.72rem', fontWeight: 700, cursor: retryingId === r.id ? 'not-allowed' : 'pointer',
+                              padding: '.2rem .65rem', opacity: retryingId === r.id ? 0.6 : 1,
+                            }}
+                          >
+                            {retryingId === r.id ? 'Retrying...' : 'Retry'}
+                          </button>
+                        )}
+                        {r.error_message && (
+                          <button
+                            onClick={() => setShowError(p => ({ ...p, [item.key]: !p[item.key] }))}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '.72rem', color: 'var(--gray-400)', padding: 0 }}
+                          >
+                            {showError[item.key] ? 'Hide technical details ▲' : 'Show technical details ▼'}
+                          </button>
+                        )}
+                      </div>
+                      {showError[item.key] && r.error_message && (
+                        <div style={{ marginTop: '.3rem', fontSize: '.7rem', color: 'var(--gray-500)', fontFamily: 'var(--font-mono)', background: 'var(--gray-50)', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-sm)', padding: '.4rem .6rem', wordBreak: 'break-all' }}>
+                          {r.error_message}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -1431,7 +1507,13 @@ export default function BabyDetailPage() {
           </div>
 
           {/* Unified contact activity log */}
-          <UnifiedContactLog babyId={id} reminders={reminders} canAddNote={canAddNote} />
+          <UnifiedContactLog
+            babyId={id}
+            reminders={reminders}
+            canAddNote={canAddNote}
+            canRetry={isCoordinator}
+            onCallClick={() => setShowCallPanel(true)}
+          />
 
         </div>
 

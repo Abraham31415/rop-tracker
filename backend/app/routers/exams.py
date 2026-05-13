@@ -12,6 +12,7 @@ from app.models.user import User, UserRole
 from app.schemas.exam import ExamCreate, ExamOut
 from app.auth.jwt import get_current_user
 from app.services.scheduling import derive_worst_finding, calculate_next_exam_weeks, next_due_date
+from app.utils.audit import write_audit
 
 router = APIRouter(prefix="/api/exams", tags=["exams"])
 
@@ -102,6 +103,22 @@ def record_exam(
         status=AppointmentStatus.SCHEDULED,
     )
     db.add(appointment)
+    write_audit(
+        db,
+        user_id=current_user.id,
+        user_name=current_user.full_name,
+        user_role=current_user.role.value,
+        action_type="EXAM",
+        entity_type="Exam",
+        entity_id=str(exam.id),
+        details={
+            "baby_id": str(data.baby_id),
+            "exam_date": str(data.exam_date),
+            "worst_zone": str(exam.worst_zone) if exam.worst_zone else None,
+            "worst_stage": str(exam.worst_stage) if exam.worst_stage else None,
+            "treatment_recommended": exam.treatment_recommended,
+        },
+    )
     db.commit()
     db.refresh(exam)
     return exam

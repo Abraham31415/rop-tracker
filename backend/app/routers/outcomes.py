@@ -12,6 +12,7 @@ from app.auth.jwt import get_current_user
 from app.models.baby import Baby
 from app.models.outcome import Outcome, TreatmentType, TreatmentEye, VisualOutcome, DischargeStatus
 from app.models.user import User, UserRole
+from app.utils.audit import write_audit
 
 router = APIRouter(prefix="/api/outcomes", tags=["outcomes"])
 
@@ -99,6 +100,21 @@ def upsert_outcome(
     elif data.treatment_type and data.treatment_type != TreatmentType.NONE:
         baby.status = "treated"
 
+    action = "TREATMENT" if (data.treatment_type and data.treatment_type != TreatmentType.NONE) else "UPDATE"
+    write_audit(
+        db,
+        user_id=user.id,
+        user_name=user.full_name,
+        user_role=user.role.value,
+        action_type=action,
+        entity_type="Outcome",
+        entity_id=str(baby_id),
+        details={
+            "treatment_type": data.treatment_type.value if data.treatment_type else None,
+            "treatment_eye": data.treatment_eye.value if data.treatment_eye else None,
+            "discharge_status": data.discharge_status.value if data.discharge_status else None,
+        },
+    )
     db.commit()
     db.refresh(outcome)
 

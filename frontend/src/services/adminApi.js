@@ -39,3 +39,24 @@ export const activateCoordinator = (id) =>
 
 export const getAuditLogs = (params) =>
   adminApi.get('/api/admin/audit', { params }).then(r => r.data)
+
+export const listHospitals = () =>
+  adminApi.get('/api/admin/hospitals').then(r => r.data)
+
+export const createHospital = (data) =>
+  adminApi.post('/api/admin/hospitals', data).then(r => r.data)
+
+export const updateHospital = (id, data) =>
+  adminApi.patch(`/api/admin/hospitals/${id}`, data).then(r => r.data)
+
+export const deactivateHospital = (id) =>
+  adminApi.patch(`/api/admin/hospitals/${id}/deactivate`).then(r => r.data)
+
+export const activateHospital = (id) =>
+  adminApi.patch(`/api/admin/hospitals/${id}/activate`).then(r => r.data)
+
+export const pingAdmin = () =>
+  adminApi.get('/api/admin/ping').then(r => r.data)
+
+export const getAdminHealth = () =>
+  adminApi.get('/api/admin/health').then(r => r.data)

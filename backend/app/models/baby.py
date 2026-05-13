@@ -47,7 +47,7 @@ class Baby(Base):
     # Identity
     full_name = Column(String, nullable=False)
     date_of_birth = Column(Date, nullable=False)
-    sex = Column(Enum(Sex, values_callable=lambda x: [e.value for e in x]), nullable=False)
+    sex = Column(Enum(Sex, values_callable=lambda x: [e.name for e in x]), nullable=False)
 
     # Birth metrics
     birth_weight_grams = Column(Float, nullable=False)
@@ -71,14 +71,14 @@ class Baby(Base):
     caregiver_name = Column(String, nullable=False)
     mtn_phone = Column(String, nullable=True)
     airtel_phone = Column(String, nullable=True)
-    language_preference = Column(Enum(Language, values_callable=lambda x: [e.value for e in x]), default=Language.ENGLISH)
+    language_preference = Column(Enum(Language, values_callable=lambda x: [e.name for e in x]), default=Language.ENGLISH)
 
     # Status
-    status = Column(Enum(BabyStatus, values_callable=lambda x: [e.value for e in x]), default=BabyStatus.ACTIVE)
+    status = Column(Enum(BabyStatus, values_callable=lambda x: [e.name for e in x]), default=BabyStatus.ACTIVE)
     notes = Column(Text, nullable=True)
 
     # Dilation (set by NICU nurse before screening)
-    dilation_status = Column(Enum(DilationStatus, values_callable=lambda x: [e.value for e in x]), nullable=True)
+    dilation_status = Column(Enum(DilationStatus, values_callable=lambda x: [e.name for e in x]), nullable=True)
     dilation_updated_at = Column(DateTime(timezone=True), nullable=True)
     dilation_updated_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 

@@ -43,6 +43,7 @@ export const listReminders = (params) => api.get('/api/reminders/', { params }).
 export const previewReminder = (babyId, trigger) => api.get(`/api/reminders/preview/${babyId}`, { params: { trigger } }).then(r => r.data)
 export const sendReminderNow = (babyId, trigger) => api.post(`/api/reminders/send/${babyId}`, null, { params: { trigger } }).then(r => r.data)
 export const logPhoneCall = (babyId, outcome, notes) => api.post(`/api/reminders/log-call/${babyId}`, { outcome, notes }).then(r => r.data)
+export const retrySMS = (reminderId) => api.post(`/api/reminders/${reminderId}/retry`).then(r => r.data)
 
 // ── Alerts ────────────────────────────────────────────────────────────────────
 export const getAlerts = () => api.get('/api/alerts/').then(r => r.data)

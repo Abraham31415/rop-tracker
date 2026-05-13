@@ -4,6 +4,8 @@ import { useAdminAuth } from '../contexts/AdminAuthContext'
 const NAV = [
   { to: '/admin/dashboard',     label: 'Dashboard' },
   { to: '/admin/coordinators',  label: 'Coordinators' },
+  { to: '/admin/hospitals',     label: 'Hospitals' },
+  { to: '/admin/health',        label: 'System Health' },
   { to: '/admin/audit',         label: 'Audit Log' },
 ]
 

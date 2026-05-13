@@ -1,7 +1,8 @@
 from __future__ import annotations
 from uuid import UUID
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import cast, String
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -11,8 +12,10 @@ from app.models.hospital import Hospital
 from app.models.contact_log import ContactLog, ContactLogType
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.outcome import Outcome, DischargeStatus
+from app.models.reminder import Reminder
 from app.schemas.baby import BabyCreate, BabyUpdate, BabyOut, BabyDashboardItem, DilationUpdate
 from app.auth.jwt import get_current_user
+from app.utils.audit import write_audit
 from pydantic import BaseModel
 from typing import Optional
 
@@ -45,6 +48,17 @@ def enroll_baby(
     baby_data = data.model_dump(exclude={'hospital_id'})
     baby = Baby(**baby_data, hospital_id=data.hospital_id, enrolled_by_id=current_user.id)
     db.add(baby)
+    db.flush()
+    write_audit(
+        db,
+        user_id=current_user.id,
+        user_name=current_user.full_name,
+        user_role=current_user.role.value,
+        action_type="ENROLL",
+        entity_type="Baby",
+        entity_id=str(baby.id),
+        details={"full_name": baby.full_name, "hospital_id": str(baby.hospital_id)},
+    )
     db.commit()
     db.refresh(baby)
     return baby
@@ -171,7 +185,6 @@ def update_baby(
     for field, new_val in changes.items():
         old_val = getattr(baby, field, None)
         setattr(baby, field, new_val)
-        # Write a contact log entry for caregiver-detail fields
         if field in CAREGIVER_FIELDS and str(old_val) != str(new_val):
             label = CAREGIVER_FIELDS[field]
             log = ContactLog(
@@ -185,6 +198,17 @@ def update_baby(
             )
             db.add(log)
 
+    if changes:
+        write_audit(
+            db,
+            user_id=current_user.id,
+            user_name=current_user.full_name,
+            user_role=current_user.role.value,
+            action_type="UPDATE",
+            entity_type="Baby",
+            entity_id=str(baby.id),
+            details={"fields": list(changes.keys())},
+        )
     db.commit()
     db.refresh(baby)
     return baby
@@ -265,6 +289,16 @@ def dashboard_urgency(
 
     babies = query.all()
     today = date.today()
+
+    # Pre-fetch babies with failed SMS in the last 48 hours (one bulk query)
+    cutoff_48h = datetime.now(timezone.utc) - timedelta(hours=48)
+    sms_failed_ids = {
+        row[0] for row in db.query(Reminder.baby_id).filter(
+            cast(Reminder.status, String) == 'FAILED',
+            Reminder.created_at >= cutoff_48h,
+        ).all()
+    }
+
     items = []
 
     for baby in babies:
@@ -311,6 +345,7 @@ def dashboard_urgency(
             caregiver_name=baby.caregiver_name,
             mtn_phone=baby.mtn_phone,
             airtel_phone=baby.airtel_phone,
+            sms_failed_recently=baby.id in sms_failed_ids,
         ))
 
     if urgency_filter:
@@ -420,6 +455,16 @@ def discharge_baby(
     )
     db.add(log)
 
+    write_audit(
+        db,
+        user_id=current_user.id,
+        user_name=current_user.full_name,
+        user_role=current_user.role.value,
+        action_type="DISCHARGE",
+        entity_type="Baby",
+        entity_id=str(baby_id),
+        details={"reason": data.discharge_reason, "notes": data.notes},
+    )
     db.commit()
     db.refresh(baby)
     return baby
@@ -461,6 +506,15 @@ def reactivate_baby(
     )
     db.add(log)
 
+    write_audit(
+        db,
+        user_id=current_user.id,
+        user_name=current_user.full_name,
+        user_role=current_user.role.value,
+        action_type="REACTIVATE",
+        entity_type="Baby",
+        entity_id=str(baby_id),
+    )
     db.commit()
     db.refresh(baby)
     return baby

@@ -16,6 +16,7 @@ from app.database import get_db
 from app.auth.jwt import get_current_user
 from app.models.hospital import Hospital
 from app.models.user import User, UserRole
+from app.utils.audit import write_audit
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -86,6 +87,17 @@ def create_user(
         hospital_id=hospital_id,
     )
     db.add(new_user)
+    db.flush()
+    write_audit(
+        db,
+        user_id=current.id,
+        user_name=current.full_name,
+        user_role=current.role.value,
+        action_type="CREATE",
+        entity_type="User",
+        entity_id=str(new_user.id),
+        details={"email": new_user.email, "role": str(new_user.role.value), "hospital_id": str(hospital_id)},
+    )
     db.commit()
     db.refresh(new_user)
     return _serialize(new_user, db)
@@ -105,6 +117,16 @@ def deactivate_user(
     if str(target.id) == str(current.id):
         raise HTTPException(400, "Cannot deactivate your own account")
     target.is_active = False
+    write_audit(
+        db,
+        user_id=current.id,
+        user_name=current.full_name,
+        user_role=current.role.value,
+        action_type="DEACTIVATE",
+        entity_type="User",
+        entity_id=str(target.id),
+        details={"email": target.email, "role": str(target.role.value)},
+    )
     db.commit()
     return _serialize(target, db)
 
@@ -121,5 +143,15 @@ def activate_user(
     if current.role == UserRole.HOSPITAL_COORDINATOR and target.hospital_id != current.hospital_id:
         raise HTTPException(403, "Not your hospital")
     target.is_active = True
+    write_audit(
+        db,
+        user_id=current.id,
+        user_name=current.full_name,
+        user_role=current.role.value,
+        action_type="ACTIVATE",
+        entity_type="User",
+        entity_id=str(target.id),
+        details={"email": target.email, "role": str(target.role.value)},
+    )
     db.commit()
     return _serialize(target, db)

@@ -95,9 +95,22 @@ function BabyCard({ baby }) {
             &nbsp;·&nbsp; DOB {format(new Date(baby.date_of_birth + 'T00:00:00'), 'dd MMM yyyy')}
           </div>
         </div>
-        <span className={`badge badge-${baby.urgency}`} style={{ flexShrink: 0 }}>
-          {baby.urgency === 'ltfu' ? 'LTFU' : baby.urgency === 'due_today' ? 'Today' : baby.urgency === 'due_soon' ? 'Soon' : 'On Track'}
-        </span>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.3rem', flexShrink: 0 }}>
+          <span className={`badge badge-${baby.urgency}`}>
+            {baby.urgency === 'ltfu' ? 'LTFU' : baby.urgency === 'due_today' ? 'Today' : baby.urgency === 'due_soon' ? 'Soon' : 'On Track'}
+          </span>
+          {baby.sms_failed_recently && (
+            <span style={{
+              fontSize: '.68rem', fontWeight: 700,
+              background: '#FEF3C7', color: '#92400E',
+              border: '1px solid #FCD34D',
+              borderRadius: 999, padding: '.1rem .45rem',
+              whiteSpace: 'nowrap',
+            }}>
+              SMS failed
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="baby-card-body">

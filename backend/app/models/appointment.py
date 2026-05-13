@@ -24,7 +24,7 @@ class Appointment(Base):
     exam_id = Column(UUID(as_uuid=True), ForeignKey("exams.id"), nullable=True)  # exam that generated this appt
 
     due_date = Column(Date, nullable=False)
-    status = Column(Enum(AppointmentStatus, values_callable=lambda x: [e.value for e in x]), default=AppointmentStatus.SCHEDULED)
+    status = Column(Enum(AppointmentStatus, values_callable=lambda x: [e.name for e in x]), default=AppointmentStatus.SCHEDULED)
 
     attended_at = Column(DateTime(timezone=True), nullable=True)
     missed_at = Column(DateTime(timezone=True), nullable=True)

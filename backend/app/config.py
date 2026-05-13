@@ -21,6 +21,17 @@ class Settings(BaseSettings):
     ADMIN_PASSWORD: str = "change-me-in-production"
     ADMIN_SECRET_KEY: str = ""
 
+    # Alert thresholds
+    AT_BALANCE_ALERT_THRESHOLD: float = 5000.0
+
+    # SMTP for critical alert emails (leave blank to disable)
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    ALERT_FROM_EMAIL: str = ""
+    ALERT_TO_EMAIL: str = ""
+
     class Config:
         env_file = ".env"
 

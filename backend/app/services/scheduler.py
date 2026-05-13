@@ -27,6 +27,9 @@ from app.models.screening_request import ScreeningRequest, ScreeningRequestStatu
 
 logger = logging.getLogger(__name__)
 
+# Tracks the last successful completion time for each job (module-level, in-process only)
+_last_run: dict[str, datetime] = {}
+
 # One executor thread is enough — jobs are short DB queries + one HTTP call each
 _scheduler = BackgroundScheduler(
     executors={"default": ThreadPoolExecutor(2)},
@@ -90,6 +93,8 @@ def _send_upcoming_reminders(days_before: int, trigger: str) -> None:
                 "Reminder job %s (T-%dd): %d sent, %d skipped, %d failed",
                 trigger, days_before, sent, skipped, failed,
             )
+        job_id = f"reminder_{trigger.replace('-', '_')}"
+        _last_run[job_id] = datetime.now(timezone.utc)
     except Exception:
         logger.exception("Error in reminder job %s", trigger)
         db.rollback()
@@ -186,6 +191,7 @@ def _mark_missed_and_ltfu() -> None:
             db.commit()
             logger.info("Escalated %d appointment(s) to LTFU", len(ltfu_appts))
 
+        _last_run["mark_missed_ltfu"] = datetime.now(timezone.utc)
     except Exception:
         logger.exception("Error in mark_missed_ltfu job")
         db.rollback()
@@ -243,6 +249,7 @@ def _escalate_stale_screening_requests() -> None:
             db.commit()
             logger.info("Escalated %d stale screening request(s)", len(stale))
 
+        _last_run["escalate_screening_requests"] = datetime.now(timezone.utc)
     except Exception:
         logger.exception("Error in escalate_screening_requests job")
         db.rollback()
@@ -251,6 +258,23 @@ def _escalate_stale_screening_requests() -> None:
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
+
+def get_scheduler_state() -> dict:
+    """Return current scheduler status for the health dashboard."""
+    jobs = {}
+    for job in _scheduler.get_jobs():
+        last = _last_run.get(job.id)
+        jobs[job.id] = {
+            "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
+            "last_run": last.isoformat() if last else None,
+        }
+    all_last = [v for v in _last_run.values()]
+    return {
+        "running": _scheduler.running,
+        "jobs": jobs,
+        "last_any_run": max(all_last).isoformat() if all_last else None,
+    }
+
 
 def start_scheduler() -> None:
     """Register all jobs and start the scheduler. Call once at app startup."""

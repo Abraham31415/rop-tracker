@@ -48,14 +48,14 @@ class Outcome(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     baby_id = Column(UUID(as_uuid=True), ForeignKey("babies.id"), unique=True, nullable=False)
 
-    treatment_type = Column(Enum(TreatmentType, values_callable=lambda x: [e.value for e in x]), nullable=True)
-    treatment_eye = Column(Enum(TreatmentEye, values_callable=lambda x: [e.value for e in x]), nullable=True)
+    treatment_type = Column(Enum(TreatmentType, values_callable=lambda x: [e.name for e in x]), nullable=True)
+    treatment_eye = Column(Enum(TreatmentEye, values_callable=lambda x: [e.name for e in x]), nullable=True)
     treatment_date = Column(Date, nullable=True)
     treatment_hospital_id = Column(UUID(as_uuid=True), ForeignKey("hospitals.id"), nullable=True)
     treating_ophthalmologist = Column(String, nullable=True)
 
-    visual_outcome = Column(Enum(VisualOutcome, values_callable=lambda x: [e.value for e in x]), nullable=True)
-    discharge_status = Column(Enum(DischargeStatus, values_callable=lambda x: [e.value for e in x]), nullable=True)
+    visual_outcome = Column(Enum(VisualOutcome, values_callable=lambda x: [e.name for e in x]), nullable=True)
+    discharge_status = Column(Enum(DischargeStatus, values_callable=lambda x: [e.name for e in x]), nullable=True)
     discharge_date = Column(Date, nullable=True)
     notes = Column(Text, nullable=True)
 

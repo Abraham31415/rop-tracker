@@ -26,7 +26,7 @@ class ContactLog(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     log_type = Column(
-        Enum(ContactLogType, values_callable=lambda x: [e.value for e in x]),
+        Enum(ContactLogType, values_callable=lambda x: [e.name for e in x]),
         nullable=False,
     )
 

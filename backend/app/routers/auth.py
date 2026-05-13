@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models.user import User
 from app.schemas.user import UserCreate, UserOut, Token, LoginRequest
 from app.auth.jwt import hash_password, verify_password, create_access_token, get_current_user
+from app.utils.audit import write_audit
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -40,6 +41,17 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     if not user or not verify_password(data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     token = create_access_token({"sub": str(user.id), "role": user.role})
+    write_audit(
+        db,
+        user_id=user.id,
+        user_name=user.full_name,
+        user_role=user.role.value,
+        action_type="LOGIN",
+        entity_type="User",
+        entity_id=str(user.id),
+        details={"email": user.email},
+    )
+    db.commit()
     return {"access_token": token, "token_type": "bearer", "user": user}
 
 

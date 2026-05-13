@@ -137,6 +137,40 @@ def send_reminder_now(
     return _serialize_reminder(reminder)
 
 
+# ── Retry a failed reminder ──────────────────────────────────────────────────
+
+@router.post("/{reminder_id}/retry")
+def retry_reminder(
+    reminder_id: UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Retry sending a failed SMS reminder. Creates a new reminder record."""
+    from app.services.messaging import dispatch_reminder
+
+    if user.role not in (UserRole.HOSPITAL_COORDINATOR, UserRole.CENTRAL_COORDINATOR):
+        raise HTTPException(status_code=403, detail="Coordinators only")
+
+    reminder = db.query(Reminder).filter(Reminder.id == reminder_id).first()
+    if not reminder:
+        raise HTTPException(404, "Reminder not found")
+    if reminder.status != ReminderStatus.FAILED:
+        raise HTTPException(400, "Only failed reminders can be retried")
+
+    baby = db.query(Baby).filter(Baby.id == reminder.baby_id).first()
+    if not baby:
+        raise HTTPException(404, "Baby not found")
+    if user.role == UserRole.HOSPITAL_COORDINATOR and baby.hospital_id != user.hospital_id:
+        raise HTTPException(403, "Baby is not in your hospital")
+
+    appt = db.query(Appointment).filter(Appointment.id == reminder.appointment_id).first()
+    if not appt:
+        raise HTTPException(404, "Original appointment no longer exists")
+
+    new_reminder = dispatch_reminder(db, appt, reminder.trigger)
+    return _serialize_reminder(new_reminder)
+
+
 # ── Log phone call ───────────────────────────────────────────────────────────
 
 class CallLogBody(BaseModel):
