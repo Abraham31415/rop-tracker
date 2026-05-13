@@ -21,6 +21,13 @@ class Settings(BaseSettings):
     ADMIN_PASSWORD: str = "change-me-in-production"
     ADMIN_SECRET_KEY: str = ""
 
+    # Admin-specific session secret (separate from clinical JWT secret)
+    ADMIN_SESSION_SECRET: str = ""
+    # TOTP 2FA secret (base32, generated on first setup)
+    ADMIN_TOTP_SECRET: str = ""
+    # Set to True in production to enable Secure cookies and HTTPS-only behaviour
+    PRODUCTION: bool = False
+
     # Alert thresholds
     AT_BALANCE_ALERT_THRESHOLD: float = 5000.0
 

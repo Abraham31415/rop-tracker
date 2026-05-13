@@ -1,5 +1,8 @@
 from __future__ import annotations
+
 import os
+import time
+import uuid
 import urllib.request
 import urllib.error
 import json as _json
@@ -7,8 +10,8 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Optional, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.security import OAuth2PasswordBearer
+import pyotp
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from jose import JWTError, jwt
 from pydantic import BaseModel
 from sqlalchemy import func, cast, String, text
@@ -23,47 +26,127 @@ from app.models.audit_log import AuditLog
 from app.models.reminder import Reminder, ReminderStatus
 from app.utils.audit import write_audit
 
-router = APIRouter(prefix="/api/admin", tags=["admin"])
+router = APIRouter(prefix="/api/sys-mgmt", tags=["admin"])
 
-_ADMIN_TOKEN_EXPIRE_MINUTES = 480
-_ADMIN_SCHEME = OAuth2PasswordBearer(tokenUrl="/api/admin/login")
+_ADMIN_TOKEN_EXPIRE_MINUTES = 120   # 2-hour session
+
+# ── In-memory session state ───────────────────────────────────────────────────
+_active_session_jti: Optional[str] = None
+
+# ── Rate limiting (per IP, in-memory) ────────────────────────────────────────
+_LOGIN_WINDOW_SECONDS = 30 * 60   # 30 minutes
+_LOGIN_MAX_FAILURES   = 5
+_login_failures: dict[str, list[float]] = {}   # ip -> list of failure timestamps
+
+# ── TOTP setup secret (used when ADMIN_TOTP_SECRET not yet persisted in env) ──
+_setup_totp_secret: Optional[str] = None
+
+
+def _get_totp_secret() -> str:
+    """Return active TOTP secret, auto-generating one for first-run setup."""
+    global _setup_totp_secret
+    if settings.ADMIN_TOTP_SECRET:
+        return settings.ADMIN_TOTP_SECRET
+    if not _setup_totp_secret:
+        _setup_totp_secret = pyotp.random_base32()
+    return _setup_totp_secret
+
+
+# ── Rate-limit helpers ────────────────────────────────────────────────────────
+
+def _check_rate_limit(ip: str) -> None:
+    now = time.time()
+    recent = [t for t in _login_failures.get(ip, []) if now - t < _LOGIN_WINDOW_SECONDS]
+    _login_failures[ip] = recent
+    if len(recent) >= _LOGIN_MAX_FAILURES:
+        wait_secs = int(_LOGIN_WINDOW_SECONDS - (now - recent[0]))
+        mins = max(1, (wait_secs + 59) // 60)
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many failed attempts. Try again in {mins} minute{'s' if mins != 1 else ''}.",
+            headers={"Retry-After": str(wait_secs)},
+        )
+
+
+def _record_failure(ip: str) -> None:
+    now = time.time()
+    recent = [t for t in _login_failures.get(ip, []) if now - t < _LOGIN_WINDOW_SECONDS]
+    recent.append(now)
+    _login_failures[ip] = recent
+
+
+def _reset_rate_limit(ip: str) -> None:
+    _login_failures.pop(ip, None)
+
 
 # ── Admin JWT helpers ─────────────────────────────────────────────────────────
 
 def _admin_secret() -> str:
-    key = settings.ADMIN_SECRET_KEY or settings.SECRET_KEY
-    return key
+    return settings.ADMIN_SESSION_SECRET or settings.ADMIN_SECRET_KEY or settings.SECRET_KEY
 
 
 def _create_admin_token() -> str:
+    global _active_session_jti
+    jti = str(uuid.uuid4())
+    _active_session_jti = jti
     payload = {
         "sub": "admin",
         "role": "superadmin",
+        "jti": jti,
         "exp": datetime.now(timezone.utc) + timedelta(minutes=_ADMIN_TOKEN_EXPIRE_MINUTES),
     }
     return jwt.encode(payload, _admin_secret(), algorithm=settings.ALGORITHM)
 
 
-def _verify_admin_token(token: str = Depends(_ADMIN_SCHEME)) -> dict:
+def _verify_admin_token(admin_session: Optional[str] = Cookie(None)) -> dict:
+    if not admin_session:
+        raise HTTPException(status_code=401, detail="Not authenticated")
     try:
-        payload = jwt.decode(token, _admin_secret(), algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(admin_session, _admin_secret(), algorithms=[settings.ALGORITHM])
         if payload.get("role") != "superadmin":
             raise HTTPException(status_code=403, detail="Not an admin token")
+        if payload.get("jti") != _active_session_jti:
+            raise HTTPException(status_code=401, detail="Session invalidated - please log in again")
         return payload
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired admin token")
 
 
+def _set_session_cookie(response: Response, token: str) -> None:
+    """Set the HttpOnly admin session cookie with correct flags for environment."""
+    secure   = settings.PRODUCTION
+    samesite = "none" if settings.PRODUCTION else "lax"
+    response.set_cookie(
+        key="admin_session",
+        value=token,
+        httponly=True,
+        secure=secure,
+        samesite=samesite,
+        max_age=_ADMIN_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
+    )
+
+
+def _clear_session_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key="admin_session",
+        path="/",
+        httponly=True,
+        secure=settings.PRODUCTION,
+        samesite="none" if settings.PRODUCTION else "lax",
+    )
+
+
 # ── Schemas ───────────────────────────────────────────────────────────────────
 
-class AdminLoginRequest(BaseModel):
+class AdminLoginStep1(BaseModel):
     email: str
     password: str
 
 
-class AdminTokenOut(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
+class AdminLoginStep2(BaseModel):
+    totp_token: str
+    code: str
 
 
 class CoordinatorOut(BaseModel):
@@ -145,14 +228,134 @@ class DashboardStats(BaseModel):
     recent_audit_entries: int
 
 
-# ── Routes ────────────────────────────────────────────────────────────────────
+# ── Login - Step 1: email + password ─────────────────────────────────────────
 
-@router.post("/login", response_model=AdminTokenOut)
-def admin_login(data: AdminLoginRequest):
+@router.post("/login")
+def admin_login_step1(
+    data: AdminLoginStep1,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(ip)
+
     if data.email != settings.ADMIN_EMAIL or data.password != settings.ADMIN_PASSWORD:
-        raise HTTPException(status_code=401, detail="Invalid admin credentials")
-    return {"access_token": _create_admin_token()}
+        _record_failure(ip)
+        write_audit(
+            db,
+            user_name="UNKNOWN",
+            user_role="anonymous",
+            action_type="FAILED_LOGIN",
+            entity_type="Admin",
+            entity_id="admin",
+            details={"email": data.email, "ip": ip},
+            ip_address=ip,
+        )
+        db.commit()
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
+    # Issue a short-lived TOTP-pending token (5 minutes)
+    totp_payload = {
+        "sub": "admin",
+        "type": "totp_pending",
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+    }
+    totp_token = jwt.encode(totp_payload, _admin_secret(), algorithm=settings.ALGORITHM)
+
+    setup_required = not bool(settings.ADMIN_TOTP_SECRET)
+    totp_secret    = _get_totp_secret()
+    qr_uri = pyotp.totp.TOTP(totp_secret).provisioning_uri(
+        name=data.email,
+        issuer_name="ROP Tracker Uganda",
+    )
+
+    response: dict[str, Any] = {
+        "requires_totp": True,
+        "totp_token": totp_token,
+        "setup_required": setup_required,
+        "qr_uri": qr_uri if setup_required else None,
+    }
+    if setup_required:
+        # Show the raw secret once so admin can also enter it manually
+        response["totp_secret_raw"] = totp_secret
+    return response
+
+
+# ── Login - Step 2: TOTP verification → sets HttpOnly cookie ─────────────────
+
+@router.post("/login/totp")
+def admin_login_step2(
+    data: AdminLoginStep2,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(ip)
+
+    # Validate the TOTP-pending token
+    try:
+        pending = jwt.decode(data.totp_token, _admin_secret(), algorithms=[settings.ALGORITHM])
+        if pending.get("type") != "totp_pending":
+            raise HTTPException(status_code=400, detail="Invalid token type")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Session expired - please start login again")
+
+    # Verify the 6-digit TOTP code
+    totp_secret = _get_totp_secret()
+    totp = pyotp.TOTP(totp_secret)
+    if not totp.verify(data.code, valid_window=1):
+        _record_failure(ip)
+        write_audit(
+            db,
+            user_name="Admin",
+            user_role="superadmin",
+            action_type="FAILED_TOTP",
+            entity_type="Admin",
+            entity_id="admin",
+            details={"ip": ip},
+            ip_address=ip,
+        )
+        db.commit()
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    # Success - invalidate any previous session and create new one
+    _reset_rate_limit(ip)
+    token = _create_admin_token()
+    _set_session_cookie(response, token)
+
+    write_audit(
+        db,
+        user_name="Admin",
+        user_role="superadmin",
+        action_type="LOGIN",
+        entity_type="Admin",
+        entity_id="admin",
+        details={"ip": ip},
+        ip_address=ip,
+    )
+    db.commit()
+    return {"ok": True}
+
+
+# ── Session check (frontend calls this on mount to verify cookie) ─────────────
+
+@router.get("/me")
+def admin_me(_: dict = Depends(_verify_admin_token)):
+    return {"ok": True, "role": "superadmin"}
+
+
+# ── Logout ────────────────────────────────────────────────────────────────────
+
+@router.post("/logout")
+def admin_logout(response: Response):
+    global _active_session_jti
+    _active_session_jti = None
+    _clear_session_cookie(response)
+    return {"ok": True}
+
+
+# ── Dashboard stats ───────────────────────────────────────────────────────────
 
 @router.get("/dashboard", response_model=DashboardStats)
 def admin_dashboard(
@@ -196,6 +399,8 @@ def admin_dashboard(
         recent_audit_entries=recent_audit,
     )
 
+
+# ── Coordinator management ────────────────────────────────────────────────────
 
 @router.get("/coordinators", response_model=list[CoordinatorOut])
 def list_coordinators(
@@ -350,6 +555,8 @@ def activate_coordinator(
     )
 
 
+# ── Audit log ─────────────────────────────────────────────────────────────────
+
 @router.get("/audit", response_model=list[AuditLogOut])
 def list_audit_logs(
     entity_type: Optional[str] = None,
@@ -370,7 +577,7 @@ def list_audit_logs(
 # ── Hospital admin endpoints ──────────────────────────────────────────────────
 
 def _hospital_out(h: Hospital, db: Session) -> HospitalOut:
-    baby_count = db.query(func.count(Baby.id)).filter(Baby.hospital_id == h.id).scalar() or 0
+    baby_count  = db.query(func.count(Baby.id)).filter(Baby.hospital_id == h.id).scalar() or 0
     staff_count = db.query(func.count(User.id)).filter(User.hospital_id == h.id).scalar() or 0
     return HospitalOut(
         id=h.id,
@@ -506,7 +713,7 @@ def activate_hospital_admin(
     return _hospital_out(hospital, db)
 
 
-# ── Health / monitoring endpoints ─────────────────────────────────────────────
+# ── Health / monitoring ───────────────────────────────────────────────────────
 
 @router.get("/ping")
 def admin_ping(_: dict = Depends(_verify_admin_token)):
@@ -514,7 +721,7 @@ def admin_ping(_: dict = Depends(_verify_admin_token)):
 
 
 def _fetch_at_balance() -> Optional[float]:
-    """Fetch Africa's Talking account balance. Returns None on error or when simulating."""
+    """Fetch Africa's Talking account balance. Returns None on error or simulation."""
     if settings.AT_SIMULATE or not settings.AT_API_KEY:
         return None
     try:
@@ -526,7 +733,6 @@ def _fetch_at_balance() -> Optional[float]:
         with urllib.request.urlopen(req, timeout=5) as resp:
             data = _json.loads(resp.read())
         balance_str = data.get("UserData", {}).get("balance", "")
-        # Balance comes as "UGX 12500.00" — strip currency prefix
         parts = balance_str.strip().split()
         return float(parts[-1]) if parts else None
     except Exception:
@@ -541,86 +747,70 @@ def admin_health(
     from app.services.scheduler import get_scheduler_state
     from app.services.alerting import send_alert_email
 
-    now = datetime.now(timezone.utc)
-    today = date.today()
+    now      = datetime.now(timezone.utc)
+    today    = date.today()
     week_ago = now - timedelta(days=7)
     month_ago = now - timedelta(days=30)
     fifteen_min_ago = now - timedelta(minutes=15)
 
-    # ── SMS stats ─────────────────────────────────────────────────────────────
     status_col = cast(Reminder.status, String)
-    r_type_col = cast(getattr(Reminder, 'reminder_type', None) or Reminder.id, String)
 
     sent_today = db.query(func.count(Reminder.id)).filter(
-        status_col == 'SENT',
-        func.date(Reminder.created_at) == today,
+        status_col == 'SENT', func.date(Reminder.created_at) == today,
     ).scalar() or 0
 
     sent_week = db.query(func.count(Reminder.id)).filter(
-        status_col == 'SENT',
-        Reminder.created_at >= week_ago,
+        status_col == 'SENT', Reminder.created_at >= week_ago,
     ).scalar() or 0
 
     sent_month = db.query(func.count(Reminder.id)).filter(
-        status_col == 'SENT',
-        Reminder.created_at >= month_ago,
+        status_col == 'SENT', Reminder.created_at >= month_ago,
     ).scalar() or 0
 
     failed_week = db.query(func.count(Reminder.id)).filter(
-        status_col == 'FAILED',
-        Reminder.created_at >= week_ago,
+        status_col == 'FAILED', Reminder.created_at >= week_ago,
     ).scalar() or 0
 
     total_month = db.query(func.count(Reminder.id)).filter(
-        status_col.in_(['SENT', 'FAILED']),
-        Reminder.created_at >= month_ago,
+        status_col.in_(['SENT', 'FAILED']), Reminder.created_at >= month_ago,
     ).scalar() or 0
     delivery_rate = round(sent_month / total_month * 100, 1) if total_month > 0 else None
 
     at_balance = _fetch_at_balance()
 
-    # ── Application activity ──────────────────────────────────────────────────
     active_users = db.query(func.count(AuditLog.user_id.distinct())).filter(
-        AuditLog.created_at >= fifteen_min_ago,
-        AuditLog.user_id.isnot(None),
+        AuditLog.created_at >= fifteen_min_ago, AuditLog.user_id.isnot(None),
     ).scalar() or 0
 
     logins_today = db.query(func.count(AuditLog.id)).filter(
-        AuditLog.action_type == 'LOGIN',
-        func.date(AuditLog.created_at) == today,
+        AuditLog.action_type == 'LOGIN', func.date(AuditLog.created_at) == today,
     ).scalar() or 0
 
     enrollments_today = db.query(func.count(AuditLog.id)).filter(
-        AuditLog.action_type == 'ENROLL',
-        func.date(AuditLog.created_at) == today,
+        AuditLog.action_type == 'ENROLL', func.date(AuditLog.created_at) == today,
     ).scalar() or 0
 
     enrollments_week = db.query(func.count(AuditLog.id)).filter(
-        AuditLog.action_type == 'ENROLL',
-        AuditLog.created_at >= week_ago,
+        AuditLog.action_type == 'ENROLL', AuditLog.created_at >= week_ago,
     ).scalar() or 0
 
     exams_today = db.query(func.count(AuditLog.id)).filter(
-        AuditLog.action_type == 'EXAM',
-        func.date(AuditLog.created_at) == today,
+        AuditLog.action_type == 'EXAM', func.date(AuditLog.created_at) == today,
     ).scalar() or 0
 
     exams_week = db.query(func.count(AuditLog.id)).filter(
-        AuditLog.action_type == 'EXAM',
-        AuditLog.created_at >= week_ago,
+        AuditLog.action_type == 'EXAM', AuditLog.created_at >= week_ago,
     ).scalar() or 0
 
     last_activity = db.query(func.max(AuditLog.created_at)).scalar()
 
-    # ── DB size ───────────────────────────────────────────────────────────────
     db_size_bytes = db.execute(
         text("SELECT pg_database_size(current_database())")
     ).scalar() or 0
 
-    # ── Scheduler state ───────────────────────────────────────────────────────
     scheduler = get_scheduler_state()
 
-    # ── Threshold alerts — log to audit_log when they fire ───────────────────
+    # Threshold alerts
     alert_writes: list[tuple[str, str]] = []
 
     if delivery_rate is not None and delivery_rate < 75:
@@ -647,7 +837,7 @@ def admin_health(
         if (now - last_dt).total_seconds() > 26 * 3600:
             fired = send_alert_email(
                 subject="Scheduler has not run in over 26 hours",
-                body=f"The reminder scheduler last ran at {last_any}. This may indicate a problem with the background job executor.",
+                body=f"The reminder scheduler last ran at {last_any}. This may indicate a problem.",
                 alert_key="scheduler_stale",
             )
             if fired:
@@ -667,7 +857,6 @@ def admin_health(
             )
         db.commit()
 
-    # ── Recent alerts (last 7 days) ───────────────────────────────────────────
     raw_alerts = (
         db.query(AuditLog)
         .filter(
@@ -709,9 +898,7 @@ def admin_health(
             "last_activity": last_activity.isoformat() if last_activity else None,
         },
         "scheduler": scheduler,
-        "db": {
-            "size_bytes": db_size_bytes,
-        },
+        "db": {"size_bytes": db_size_bytes},
         "recent_alerts": recent_alerts,
         "fetched_at": now.isoformat(),
     }

@@ -2,20 +2,20 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAdminAuth } from '../contexts/AdminAuthContext'
 
 const NAV = [
-  { to: '/admin/dashboard',     label: 'Dashboard' },
-  { to: '/admin/coordinators',  label: 'Coordinators' },
-  { to: '/admin/hospitals',     label: 'Hospitals' },
-  { to: '/admin/health',        label: 'System Health' },
-  { to: '/admin/audit',         label: 'Audit Log' },
+  { to: '/sys-mgmt/dashboard',     label: 'Dashboard' },
+  { to: '/sys-mgmt/coordinators',  label: 'Coordinators' },
+  { to: '/sys-mgmt/hospitals',     label: 'Hospitals' },
+  { to: '/sys-mgmt/health',        label: 'System Health' },
+  { to: '/sys-mgmt/audit',         label: 'Audit Log' },
 ]
 
 export default function AdminShell() {
   const { logout } = useAdminAuth()
   const navigate = useNavigate()
 
-  function handleLogout() {
-    logout()
-    navigate('/admin/login')
+  async function handleLogout() {
+    await logout()
+    navigate('/sys-mgmt/login')
   }
 
   return (

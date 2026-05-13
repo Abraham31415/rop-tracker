@@ -37,8 +37,12 @@ function PrivateRoute({ children }) {
 }
 
 function AdminRoute({ children }) {
-  const { isAuthenticated } = useAdminAuth()
-  if (!isAuthenticated) return <Navigate to="/admin/login" replace />
+  const { isAuthenticated, loading } = useAdminAuth()
+  // While checking the session cookie with the server, show a blank screen
+  if (loading || isAuthenticated === null) {
+    return <div style={{ minHeight: '100vh', background: '#0F172A' }} />
+  }
+  if (!isAuthenticated) return <Navigate to="/sys-mgmt/login" replace />
   return children
 }
 
@@ -47,58 +51,44 @@ export default function App() {
     <AdminAuthProvider>
     <AuthProvider>
       <Routes>
+        {/* ── Clinical app ──────────────────────────────────────────────── */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/" element={<PrivateRoute><AppShell /></PrivateRoute>}>
           <Route index element={<Navigate to="/dashboard" replace />} />
 
-          {/* Dashboard — all roles, internally routes to role-specific view */}
-          <Route path="dashboard" element={<DashboardPage />} />
-
-          {/* Baby browsing — all roles */}
+          <Route path="dashboard"       element={<DashboardPage />} />
           <Route path="babies"          element={<AllBabiesPage />} />
           <Route path="babies/:id"      element={<BabyDetailPage />} />
           <Route path="search"          element={<SearchPage />} />
           <Route path="appointments"    element={<AppointmentsPage />} />
 
-          {/* Record exam — ophthalmologists + coordinators */}
           <Route path="babies/:id/exam" element={
             <ProtectedRoute roles={OPHTHALM_UP}><RecordExamPage /></ProtectedRoute>
           } />
-
-          {/* Enrollment — nurses + coordinators (not ophthalmologists) */}
           <Route path="enroll" element={
             <ProtectedRoute roles={ENROLLERS}><EnrollBabyPage /></ProtectedRoute>
           } />
-
-          {/* Notifications — ophthalmologists + coordinators */}
           <Route path="notifications" element={
             <ProtectedRoute roles={OPHTHALM_UP}><NotificationsPage /></ProtectedRoute>
           } />
-
-          {/* Reports — coordinators only */}
           <Route path="reports" element={
             <ProtectedRoute roles={COORDINATORS}><ReportsPage /></ProtectedRoute>
           } />
-
-          {/* Settings — coordinators only */}
           <Route path="settings" element={
             <ProtectedRoute roles={COORDINATORS}><SettingsPage /></ProtectedRoute>
           } />
-
-          {/* Network overview — central coordinator only */}
           <Route path="network" element={
             <ProtectedRoute roles={['central_coordinator']}><NetworkDashboardPage /></ProtectedRoute>
           } />
-
-          {/* Analytics — central coordinator only */}
           <Route path="analytics" element={
             <ProtectedRoute roles={['central_coordinator']}><AnalyticsPage /></ProtectedRoute>
           } />
         </Route>
-        {/* Admin panel — completely separate auth */}
-        <Route path="/admin/login" element={<AdminLoginPage />} />
-        <Route path="/admin" element={<AdminRoute><AdminShell /></AdminRoute>}>
-          <Route index element={<Navigate to="/admin/dashboard" replace />} />
+
+        {/* ── Admin panel — /sys-mgmt (separate cookie auth) ────────────── */}
+        <Route path="/sys-mgmt/login" element={<AdminLoginPage />} />
+        <Route path="/sys-mgmt" element={<AdminRoute><AdminShell /></AdminRoute>}>
+          <Route index element={<Navigate to="/sys-mgmt/dashboard" replace />} />
           <Route path="dashboard"    element={<AdminDashboardPage />} />
           <Route path="coordinators" element={<AdminCoordinatorsPage />} />
           <Route path="hospitals"    element={<AdminHospitalsPage />} />
@@ -106,6 +96,7 @@ export default function App() {
           <Route path="audit"        element={<AdminAuditPage />} />
         </Route>
 
+        {/* Old /admin path intentionally not defined — falls through to 404 */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </AuthProvider>

@@ -12,12 +12,24 @@ from slowapi.middleware import SlowAPIMiddleware
 
 import app.models  # noqa: F401 — registers all ORM models with Base
 
-from app.routers import auth, babies, exams, hospitals, reminders, network, alerts, notifications, reports, users, templates, outcomes, referrals, appointments, contact_logs, screening_requests, analytics, admin
+from app.routers import (
+    auth, babies, exams, hospitals, reminders, network, alerts,
+    notifications, reports, users, templates, outcomes, referrals,
+    appointments, contact_logs, screening_requests, analytics, admin,
+)
 from app.services.scheduler import start_scheduler, stop_scheduler
 
-# Paths that do not require a clinical JWT (admin routes have their own auth)
-_PUBLIC_PATHS = {"/api/auth/login", "/api/health", "/api/admin/login"}
-_ADMIN_PATH_PREFIX = "/api/admin/"
+# Paths that do not require a clinical JWT (admin routes have their own cookie auth)
+_PUBLIC_PATHS = {
+    "/api/auth/login",
+    "/api/health",
+    "/api/sys-mgmt/login",
+    "/api/sys-mgmt/login/totp",
+    "/api/sys-mgmt/me",
+    "/api/sys-mgmt/logout",
+}
+_ADMIN_PATH_PREFIX   = "/api/sys-mgmt/"
+_LEGACY_ADMIN_PREFIX = "/api/admin/"
 
 
 def _run_migrations() -> None:
@@ -50,6 +62,27 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
 
+# ── Security headers for admin API paths ──────────────────────────────────────
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith(_ADMIN_PATH_PREFIX):
+        response.headers["X-Frame-Options"]           = "DENY"
+        response.headers["X-Content-Type-Options"]    = "nosniff"
+        response.headers["Referrer-Policy"]           = "no-referrer"
+        response.headers["Content-Security-Policy"]   = "default-src 'self'"
+    return response
+
+
+# ── 404 for old /api/admin/* paths (gives nothing away) ──────────────────────
+@app.middleware("http")
+async def block_legacy_admin(request: Request, call_next):
+    if request.url.path.startswith(_LEGACY_ADMIN_PREFIX):
+        return JSONResponse({"detail": "Not Found"}, status_code=404)
+    return await call_next(request)
+
+
+# ── Clinical JWT guard ────────────────────────────────────────────────────────
 @app.middleware("http")
 async def require_auth(request: Request, call_next):
     """Reject requests to protected API paths that carry no valid JWT."""

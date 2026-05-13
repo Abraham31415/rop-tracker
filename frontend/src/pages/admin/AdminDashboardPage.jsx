@@ -99,7 +99,7 @@ function HealthSummaryRow() {
 
   return (
     <div
-      onClick={() => navigate('/admin/health')}
+      onClick={() => navigate('/sys-mgmt/health')}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -149,10 +149,10 @@ export default function AdminDashboardPage() {
         <SectionHeader title="Hospitals" />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' }}>
           <StatCard label="Total hospitals" value={data.total_hospitals} accent="#0EA5E9"
-            onClick={() => navigate('/admin/hospitals')} />
+            onClick={() => navigate('/sys-mgmt/hospitals')} />
           <StatCard label="Active hospitals" value={data.active_hospitals}
             sub={`${data.total_hospitals - data.active_hospitals} inactive`} accent="#10B981"
-            onClick={() => navigate('/admin/hospitals')} />
+            onClick={() => navigate('/sys-mgmt/hospitals')} />
         </div>
       </section>
 
@@ -160,10 +160,10 @@ export default function AdminDashboardPage() {
         <SectionHeader title="Coordinators" />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' }}>
           <StatCard label="Total coordinators" value={data.total_coordinators} accent="#8B5CF6"
-            onClick={() => navigate('/admin/coordinators')} />
+            onClick={() => navigate('/sys-mgmt/coordinators')} />
           <StatCard label="Active" value={data.active_coordinators}
             sub={`${data.total_coordinators - data.active_coordinators} inactive`} accent="#10B981"
-            onClick={() => navigate('/admin/coordinators')} />
+            onClick={() => navigate('/sys-mgmt/coordinators')} />
         </div>
       </section>
 
