@@ -28,25 +28,6 @@ from app.utils.audit import write_audit
 
 router = APIRouter(prefix="/api/sys-mgmt", tags=["admin"])
 
-# TEMP DIAGNOSTIC: log env var fingerprints at startup so we can verify Render config
-print(
-    f"[ADMIN-DIAG] ADMIN_EMAIL len={len(settings.ADMIN_EMAIL)} "
-    f"first2={settings.ADMIN_EMAIL[:2]!r} last2={settings.ADMIN_EMAIL[-2:]!r} "
-    f"is_default={settings.ADMIN_EMAIL == 'admin@roptracker.ug'}",
-    flush=True,
-)
-print(
-    f"[ADMIN-DIAG] ADMIN_PASSWORD len={len(settings.ADMIN_PASSWORD)} "
-    f"is_default={settings.ADMIN_PASSWORD == 'change-me-in-production'}",
-    flush=True,
-)
-print(
-    f"[ADMIN-DIAG] PRODUCTION={settings.PRODUCTION} "
-    f"ADMIN_SESSION_SECRET_set={bool(settings.ADMIN_SESSION_SECRET)} "
-    f"ADMIN_TOTP_SECRET_set={bool(settings.ADMIN_TOTP_SECRET)}",
-    flush=True,
-)
-
 _ADMIN_TOKEN_EXPIRE_MINUTES = 120   # 2-hour session
 
 # ── In-memory session state ───────────────────────────────────────────────────
@@ -259,14 +240,6 @@ def admin_login_step1(
     _check_rate_limit(ip)
 
     if data.email != settings.ADMIN_EMAIL or data.password != settings.ADMIN_PASSWORD:
-        # TEMP DIAGNOSTIC: print lengths to compare received vs expected
-        print(
-            f"[ADMIN-DIAG] FAIL: recv_email_len={len(data.email)} stored_email_len={len(settings.ADMIN_EMAIL)} "
-            f"email_match={data.email == settings.ADMIN_EMAIL} "
-            f"recv_pw_len={len(data.password)} stored_pw_len={len(settings.ADMIN_PASSWORD)} "
-            f"pw_match={data.password == settings.ADMIN_PASSWORD}",
-            flush=True,
-        )
         _record_failure(ip)
         write_audit(
             db,

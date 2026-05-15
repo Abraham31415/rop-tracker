@@ -8,14 +8,19 @@ const adminApi = axios.create({
   withCredentials: true,   // send the HttpOnly admin_session cookie automatically
 })
 
-// Redirect to login on any 401 (session expired or invalidated).
-// Skip the redirect when already on the login page, otherwise the session
-// check (getAdminMe) on the login page itself triggers an endless reload loop.
+// Redirect to login on a 401 from a protected endpoint (session expired).
+// Two exclusions prevent redirect loops / blinking:
+//  - the session check (/me): a 401 here is normal and handled by AdminAuthContext;
+//    redirecting would fight the router and cause flicker.
+//  - the login page itself: never redirect a page to itself.
 adminApi.interceptors.response.use(
   (r) => r,
   (err) => {
+    const url = err.config?.url || ''
+    const isSessionCheck = url.includes('/sys-mgmt/me')
     if (
       err.response?.status === 401 &&
+      !isSessionCheck &&
       !window.location.pathname.startsWith('/sys-mgmt/login')
     ) {
       window.location.href = '/sys-mgmt/login'
