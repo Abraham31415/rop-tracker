@@ -146,12 +146,13 @@ export default function AdminLoginPage() {
 
         {/* Step 1: email + password */}
         {step === 1 && (
-          <form onSubmit={handleStep1}>
+          <form onSubmit={handleStep1} autoComplete="off">
             <div style={{ marginBottom: '1rem' }}>
               <label style={LABEL_STYLE}>Admin email</label>
               <input
-                type="email"
-                autoComplete="username"
+                type="text"
+                name="admin-identifier"
+                autoComplete="off"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
@@ -162,7 +163,8 @@ export default function AdminLoginPage() {
               <label style={LABEL_STYLE}>Password</label>
               <input
                 type="password"
-                autoComplete="current-password"
+                name="admin-secret"
+                autoComplete="new-password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
