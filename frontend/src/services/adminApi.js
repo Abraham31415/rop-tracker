@@ -8,11 +8,16 @@ const adminApi = axios.create({
   withCredentials: true,   // send the HttpOnly admin_session cookie automatically
 })
 
-// Redirect to login on any 401 (session expired or invalidated)
+// Redirect to login on any 401 (session expired or invalidated).
+// Skip the redirect when already on the login page, otherwise the session
+// check (getAdminMe) on the login page itself triggers an endless reload loop.
 adminApi.interceptors.response.use(
   (r) => r,
   (err) => {
-    if (err.response?.status === 401) {
+    if (
+      err.response?.status === 401 &&
+      !window.location.pathname.startsWith('/sys-mgmt/login')
+    ) {
       window.location.href = '/sys-mgmt/login'
     }
     return Promise.reject(err)
