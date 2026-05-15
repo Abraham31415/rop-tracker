@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.user import User
-from app.schemas.user import UserCreate, UserOut, Token, LoginRequest
+from app.schemas.user import UserCreate, UserOut, Token, LoginRequest, ThemeUpdate
 from app.auth.jwt import hash_password, verify_password, create_access_token, get_current_user
 from app.utils.audit import write_audit
 
@@ -57,4 +57,18 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
 
 @router.get("/me", response_model=UserOut)
 def me(current_user: User = Depends(get_current_user)):
+    return current_user
+
+
+@router.patch("/me/theme", response_model=UserOut)
+def update_theme(
+    data: ThemeUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if data.theme not in ("light", "dark", "system"):
+        raise HTTPException(status_code=400, detail="Invalid theme")
+    current_user.theme = data.theme
+    db.commit()
+    db.refresh(current_user)
     return current_user

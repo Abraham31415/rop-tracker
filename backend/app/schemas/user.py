@@ -18,8 +18,13 @@ class UserOut(BaseModel):
     full_name: str
     role: UserRole
     hospital_id: UUID | None
+    theme: str = "system"
 
     model_config = {"from_attributes": True}
+
+
+class ThemeUpdate(BaseModel):
+    theme: str
 
 
 class Token(BaseModel):

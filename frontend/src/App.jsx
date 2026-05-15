@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { AdminAuthProvider, useAdminAuth } from './contexts/AdminAuthContext'
+import { ThemeProvider } from './contexts/ThemeContext'
 import AppShell from './components/AppShell'
 import AdminShell from './components/AdminShell'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -50,6 +51,7 @@ export default function App() {
   return (
     <AdminAuthProvider>
     <AuthProvider>
+    <ThemeProvider>
       <Routes>
         {/* ── Clinical app ──────────────────────────────────────────────── */}
         <Route path="/login" element={<LoginPage />} />
@@ -74,9 +76,7 @@ export default function App() {
           <Route path="reports" element={
             <ProtectedRoute roles={COORDINATORS}><ReportsPage /></ProtectedRoute>
           } />
-          <Route path="settings" element={
-            <ProtectedRoute roles={COORDINATORS}><SettingsPage /></ProtectedRoute>
-          } />
+          <Route path="settings" element={<SettingsPage />} />
           <Route path="network" element={
             <ProtectedRoute roles={['central_coordinator']}><NetworkDashboardPage /></ProtectedRoute>
           } />
@@ -99,6 +99,7 @@ export default function App() {
         {/* Old /admin path intentionally not defined — falls through to 404 */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+    </ThemeProvider>
     </AuthProvider>
     </AdminAuthProvider>
   )

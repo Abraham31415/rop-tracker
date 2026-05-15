@@ -10,8 +10,12 @@
     <script>
       // Apply saved theme before first paint to avoid a flash of the wrong theme
       try {
-        var t = localStorage.getItem('rop-theme');
-        if (t) document.documentElement.setAttribute('data-theme', t);
+        var t = localStorage.getItem('rop-theme') || 'system';
+        if (t === 'system') {
+          t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
+            ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', t);
       } catch (e) {}
     </script>
   </head>

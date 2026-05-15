@@ -2,35 +2,7 @@ import { Outlet, NavLink, useNavigate, useLocation, Link } from 'react-router-do
 import { useState, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
-import { useTheme } from '../contexts/ThemeContext'
 import { getAlertCount, searchBabies } from '../services/api'
-
-// ── Theme switcher (sidebar header) ───────────────────────────────────────────
-const THEME_OPTIONS = [
-  { id: 'light', label: 'Light', swatch: '#f9fafb' },
-  { id: 'dark',  label: 'Dark',  swatch: '#1a2235' },
-  { id: 'navy',  label: 'Navy',  swatch: '#0a0f1e' },
-  { id: 'slate', label: 'Slate', swatch: '#2a313c' },
-]
-function ThemeSwitcher() {
-  const { theme, setTheme } = useTheme()
-  return (
-    <div className="sidebar-theme-switcher" role="group" aria-label="Colour theme">
-      {THEME_OPTIONS.map(t => (
-        <button
-          key={t.id}
-          type="button"
-          className={`theme-swatch${theme === t.id ? ' active' : ''}`}
-          style={{ background: t.swatch }}
-          title={`${t.label} theme`}
-          aria-label={`${t.label} theme`}
-          aria-pressed={theme === t.id}
-          onClick={() => setTheme(t.id)}
-        />
-      ))}
-    </div>
-  )
-}
 
 
 const ROLE_LABELS = {
@@ -78,7 +50,7 @@ function navItems(role) {
     { to: '/reports',        label: 'Reports',         icon: <IconBarChart />, roles: ['hospital_coordinator','central_coordinator'] },
     { to: '/network',        label: 'Network Overview',icon: <IconNetwork />,  roles: ['central_coordinator'] },
     { to: '/analytics',      label: 'Analytics',       icon: <IconBarChart />, roles: ['central_coordinator'] },
-    { to: '/settings',       label: 'Settings',        icon: <IconSettings />, roles: ['hospital_coordinator','central_coordinator'] },
+    { to: '/settings',       label: 'Settings',        icon: <IconSettings />, roles: ['nicu_nurse','ophthalmologist','hospital_coordinator','central_coordinator'] },
   ]
   return all.filter(item => item.roles.includes(role))
 }
@@ -307,7 +279,6 @@ export default function AppShell() {
               <div className="sidebar-logo-sub">Uganda Network</div>
             </div>
           </div>
-          <ThemeSwitcher />
         </div>
 
         <div className="sidebar-section-label">Navigation</div>

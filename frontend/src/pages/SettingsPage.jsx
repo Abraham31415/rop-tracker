@@ -6,6 +6,7 @@ import {
   getGatewayStatus, sendTestSms,
 } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
+import { useTheme } from '../contexts/ThemeContext'
 
 // Used in the "Add Staff" form dropdown — CC accounts are created in /admin
 const ROLE_LABELS = {
@@ -450,17 +451,120 @@ function GatewayTab() {
   )
 }
 
+// ── Theme preview (miniature dashboard) ──────────────────────────────────────
+function ThemePreview({ variant }) {
+  const p = variant === 'dark'
+    ? { bg: '#0F172A', side: '#0D1B2A', card: '#1E293B', border: '#334155', bar: '#1E293B' }
+    : { bg: '#F8FAFC', side: '#0F6E56', card: '#FFFFFF', border: '#E2E8F0', bar: '#FFFFFF' }
+  return (
+    <div style={{
+      display: 'flex', height: 100, borderRadius: 6, overflow: 'hidden',
+      border: `1px solid ${p.border}`,
+    }}>
+      <div style={{
+        width: 28, background: p.side, padding: '8px 5px',
+        display: 'flex', flexDirection: 'column', gap: 5,
+      }}>
+        <div style={{ height: 6, background: 'rgba(255,255,255,.85)', borderRadius: 2 }} />
+        <div style={{ height: 5, background: 'rgba(255,255,255,.4)', borderRadius: 2 }} />
+        <div style={{ height: 5, background: 'rgba(255,255,255,.4)', borderRadius: 2 }} />
+        <div style={{ height: 5, background: 'rgba(255,255,255,.4)', borderRadius: 2 }} />
+      </div>
+      <div style={{
+        flex: 1, background: p.bg, padding: 8,
+        display: 'flex', flexDirection: 'column', gap: 6,
+      }}>
+        <div style={{ height: 11, background: p.bar, border: `1px solid ${p.border}`, borderRadius: 3 }} />
+        <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ flex: 1, height: 26, background: p.card, border: `1px solid ${p.border}`, borderRadius: 3 }} />
+          <div style={{ flex: 1, height: 26, background: p.card, border: `1px solid ${p.border}`, borderRadius: 3 }} />
+        </div>
+        <div style={{ flex: 1, background: p.card, border: `1px solid ${p.border}`, borderRadius: 3 }} />
+      </div>
+    </div>
+  )
+}
+
+// ── Preferences tab (Appearance) ─────────────────────────────────────────────
+function PreferencesTab() {
+  const { theme, resolved, setTheme } = useTheme()
+  const [toast, setToast] = useState('')
+
+  const cards = [
+    { id: 'light',  label: 'Light',  desc: 'Bright theme, best in daylight' },
+    { id: 'dark',   label: 'Dark',   desc: 'Easier on the eyes in low light' },
+    { id: 'system', label: 'System', desc: 'Follows your device setting' },
+  ]
+
+  function pick(id) {
+    if (id === theme) return
+    setTheme(id)
+    const label = id.charAt(0).toUpperCase() + id.slice(1)
+    setToast(`Theme updated to ${label} mode`)
+    setTimeout(() => setToast(''), 2800)
+  }
+
+  return (
+    <div>
+      <div style={{
+        fontSize: '.7rem', fontWeight: 700, color: 'var(--teal-600)',
+        textTransform: 'uppercase', letterSpacing: '.09em', marginBottom: '.4rem',
+      }}>
+        Appearance
+      </div>
+      <p style={{ fontSize: '.85rem', color: 'var(--gray-500)', marginBottom: '1.25rem' }}>
+        Choose how ROP Tracker looks. Your choice is saved to your account and applied on every device.
+      </p>
+
+      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+        {cards.map(c => {
+          const active = theme === c.id
+          const previewVariant = c.id === 'system' ? resolved : c.id
+          return (
+            <button
+              key={c.id}
+              type="button"
+              className={`theme-card${active ? ' active' : ''}`}
+              onClick={() => pick(c.id)}
+            >
+              <ThemePreview variant={previewVariant} />
+              <div className="theme-card-label">
+                <span>{c.label}</span>
+                {active && (
+                  <span className="theme-card-check" aria-label="Selected">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                      stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  </span>
+                )}
+              </div>
+              <div className="theme-card-desc">{c.desc}</div>
+            </button>
+          )
+        })}
+      </div>
+
+      {toast && <div className="theme-toast">{toast}</div>}
+    </div>
+  )
+}
+
 // ── Main Settings page ───────────────────────────────────────────────────────
 export default function SettingsPage() {
   const { user } = useAuth()
   const isCentral = user?.role === 'central_coordinator'
-  const [tab, setTab] = useState('users')
+  const isCoordinator = user?.role === 'hospital_coordinator' || user?.role === 'central_coordinator'
+  const [tab, setTab] = useState('preferences')
 
   const tabs = [
-    { key: 'users',     label: 'Staff Accounts' },
+    { key: 'preferences', label: 'Preferences' },
+    ...(isCoordinator ? [{ key: 'users', label: 'Staff Accounts' }] : []),
     ...(isCentral ? [{ key: 'hospitals', label: 'Hospitals' }] : []),
-    { key: 'templates', label: 'SMS Templates' },
-    { key: 'gateway',   label: 'SMS Gateway' },
+    ...(isCoordinator ? [
+      { key: 'templates', label: 'SMS Templates' },
+      { key: 'gateway',   label: 'SMS Gateway' },
+    ] : []),
   ]
 
   return (
@@ -468,7 +572,9 @@ export default function SettingsPage() {
       <div className="page-header">
         <div className="page-header-text">
           <h2>Settings</h2>
-          <p>Manage staff, hospitals, SMS templates, and gateway configuration</p>
+          <p>{isCoordinator
+            ? 'Manage your preferences, staff, hospitals, and SMS configuration'
+            : 'Manage your personal preferences'}</p>
         </div>
       </div>
 
@@ -485,10 +591,11 @@ export default function SettingsPage() {
       </div>
 
       <div style={{ marginTop: '1.5rem' }}>
-        {tab === 'users'     && <UsersTab />}
-        {tab === 'hospitals' && <HospitalsTab />}
-        {tab === 'templates' && <TemplatesTab />}
-        {tab === 'gateway'   && <GatewayTab />}
+        {tab === 'preferences' && <PreferencesTab />}
+        {tab === 'users'       && isCoordinator && <UsersTab />}
+        {tab === 'hospitals'   && isCentral && <HospitalsTab />}
+        {tab === 'templates'   && isCoordinator && <TemplatesTab />}
+        {tab === 'gateway'     && isCoordinator && <GatewayTab />}
       </div>
     </div>
   )
