@@ -14,7 +14,7 @@ import pyotp
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from jose import JWTError, jwt
 from pydantic import BaseModel
-from sqlalchemy import func, cast, String, text
+from sqlalchemy import func, cast, String, text, and_
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -218,6 +218,12 @@ class HospitalUpdate(BaseModel):
     contact_phone: Optional[str] = None
 
 
+class HospitalActivity(BaseModel):
+    name: Optional[str] = None
+    detail: Optional[str] = None
+    needs_attention: bool = False
+
+
 class DashboardStats(BaseModel):
     total_hospitals: int
     active_hospitals: int
@@ -226,6 +232,11 @@ class DashboardStats(BaseModel):
     total_babies: int
     babies_at_risk: int
     recent_audit_entries: int
+    ltfu_this_month: int
+    babies_screened: int
+    babies_treated: int
+    most_active_hospital: Optional[HospitalActivity] = None
+    least_active_hospital: Optional[HospitalActivity] = None
 
 
 # ── Login - Step 1: email + password ─────────────────────────────────────────
@@ -342,7 +353,7 @@ def admin_login_step2(
 
 @router.get("/me")
 def admin_me(_: dict = Depends(_verify_admin_token)):
-    return {"ok": True, "role": "superadmin"}
+    return {"ok": True, "role": "superadmin", "email": settings.ADMIN_EMAIL}
 
 
 # ── Logout ────────────────────────────────────────────────────────────────────
@@ -362,19 +373,25 @@ def admin_dashboard(
     db: Session = Depends(get_db),
     _: dict = Depends(_verify_admin_token),
 ):
+    from app.models.exam import Exam
+    from app.models.outcome import Outcome
+
     coord_names = ['CENTRAL_COORDINATOR', 'HOSPITAL_COORDINATOR']
     role_col = cast(User.role, String)
 
-    total_hospitals   = db.query(func.count(Hospital.id)).scalar()
-    active_hospitals  = db.query(func.count(Hospital.id)).filter(Hospital.is_active == True).scalar()
-    total_coords      = db.query(func.count(User.id)).filter(role_col.in_(coord_names)).scalar()
+    now         = datetime.now(timezone.utc)
+    today       = date.today()
+    week_ago    = now - timedelta(days=7)
+    month_start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
+
+    total_hospitals   = db.query(func.count(Hospital.id)).scalar() or 0
+    active_hospitals  = db.query(func.count(Hospital.id)).filter(Hospital.is_active == True).scalar() or 0
+    total_coords      = db.query(func.count(User.id)).filter(role_col.in_(coord_names)).scalar() or 0
     active_coords     = db.query(func.count(User.id)).filter(
         role_col.in_(coord_names), User.is_active == True
-    ).scalar()
-    total_babies      = db.query(func.count(Baby.id)).scalar()
+    ).scalar() or 0
+    total_babies      = db.query(func.count(Baby.id)).scalar() or 0
 
-    from app.models.exam import Exam
-    from app.models.outcome import Outcome
     treated_ids = {
         r[0] for r in db.query(Outcome.baby_id).filter(cast(Outcome.treatment_type, String) != 'NONE')
     }
@@ -383,11 +400,72 @@ def admin_dashboard(
     )
     if treated_ids:
         at_risk_q = at_risk_q.filter(~Exam.baby_id.in_(treated_ids))
-    at_risk = at_risk_q.scalar()
+    at_risk = at_risk_q.scalar() or 0
 
     recent_audit = db.query(func.count(AuditLog.id)).filter(
-        AuditLog.created_at >= datetime.now(timezone.utc) - timedelta(days=7)
-    ).scalar()
+        AuditLog.created_at >= week_ago
+    ).scalar() or 0
+
+    # LTFU babies whose status was last changed this month
+    ltfu_this_month = db.query(func.count(Baby.id)).filter(
+        cast(Baby.status, String) == 'LTFU',
+        Baby.updated_at >= month_start,
+    ).scalar() or 0
+
+    # Care funnel: enrolled -> screened (>=1 exam) -> treated
+    babies_screened = db.query(func.count(Exam.baby_id.distinct())).scalar() or 0
+    babies_treated  = len(treated_ids)
+
+    # Most active hospital today (by audit-log volume)
+    most_active = None
+    top = (
+        db.query(Hospital.name, func.count(AuditLog.id).label("cnt"))
+        .join(User, User.hospital_id == Hospital.id)
+        .join(AuditLog, AuditLog.user_id == User.id)
+        .filter(func.date(AuditLog.created_at) == today)
+        .group_by(Hospital.id, Hospital.name)
+        .order_by(func.count(AuditLog.id).desc())
+        .first()
+    )
+    if top:
+        most_active = HospitalActivity(
+            name=top[0],
+            detail=f"{top[1]} action{'s' if top[1] != 1 else ''} today",
+        )
+
+    # Least active hospital (longest since any staff login)
+    least_active = None
+    login_rows = (
+        db.query(Hospital.name, func.max(AuditLog.created_at).label("last_login"))
+        .outerjoin(User, User.hospital_id == Hospital.id)
+        .outerjoin(AuditLog, and_(
+            AuditLog.user_id == User.id,
+            AuditLog.action_type == "LOGIN",
+        ))
+        .filter(Hospital.is_active == True)
+        .group_by(Hospital.id, Hospital.name)
+        .all()
+    )
+    if login_rows:
+        oldest = min(
+            login_rows,
+            key=lambda r: r.last_login or datetime.min.replace(tzinfo=timezone.utc),
+        )
+        if oldest.last_login is None:
+            least_active = HospitalActivity(
+                name=oldest.name, detail="no recorded login", needs_attention=True,
+            )
+        else:
+            days = (now - oldest.last_login).days
+            if days <= 0:
+                detail = "last login today"
+            elif days == 1:
+                detail = "last login 1 day ago"
+            else:
+                detail = f"last login {days} days ago"
+            least_active = HospitalActivity(
+                name=oldest.name, detail=detail, needs_attention=days >= 7,
+            )
 
     return DashboardStats(
         total_hospitals=total_hospitals,
@@ -397,6 +475,11 @@ def admin_dashboard(
         total_babies=total_babies,
         babies_at_risk=at_risk,
         recent_audit_entries=recent_audit,
+        ltfu_this_month=ltfu_this_month,
+        babies_screened=babies_screened,
+        babies_treated=babies_treated,
+        most_active_hospital=most_active,
+        least_active_hospital=least_active,
     )
 
 
