@@ -7,6 +7,13 @@
     <meta name="theme-color" content="#1a56db" />
     <meta name="description" content="ROP Tracker Uganda — preventing loss to follow-up of premature babies" />
     <title>ROP Tracker Uganda</title>
+    <script>
+      // Apply saved theme before first paint to avoid a flash of the wrong theme
+      try {
+        var t = localStorage.getItem('rop-theme');
+        if (t) document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
