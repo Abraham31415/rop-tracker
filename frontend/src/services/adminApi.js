@@ -1,8 +1,10 @@
 import axios from 'axios'
 
-// All admin API requests use cookies for auth (HttpOnly, set by server)
+// All admin API requests use cookies for auth (HttpOnly, set by server).
+// baseURL must point at the backend (same VITE_API_URL the clinical app uses);
+// an empty baseURL would hit the Vercel static host instead of the API.
 const adminApi = axios.create({
-  baseURL: '',
+  baseURL: import.meta.env.VITE_API_URL || '',
   withCredentials: true,   // send the HttpOnly admin_session cookie automatically
 })
 
