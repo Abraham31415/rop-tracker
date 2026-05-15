@@ -18,8 +18,23 @@ def register(
     current_user: User = Depends(get_current_user),
 ):
     from app.models.user import UserRole
-    if current_user.role not in (UserRole.HOSPITAL_COORDINATOR, UserRole.CENTRAL_COORDINATOR):
-        raise HTTPException(status_code=403, detail="Only coordinators can register new users")
+    # Who may create which roles:
+    #  - central coordinator: NICU nurses, ophthalmologists, hospital coordinators
+    #  - hospital coordinator: NICU nurses only
+    #  - everyone else: nobody
+    # (Central coordinators themselves are created from the admin panel.)
+    can_create = {
+        UserRole.CENTRAL_COORDINATOR: {
+            UserRole.NICU_NURSE, UserRole.OPHTHALMOLOGIST, UserRole.HOSPITAL_COORDINATOR,
+        },
+        UserRole.HOSPITAL_COORDINATOR: {UserRole.NICU_NURSE},
+    }
+    allowed = can_create.get(current_user.role, set())
+    if data.role not in allowed:
+        raise HTTPException(
+            status_code=403,
+            detail="You do not have permission to create an account with that role",
+        )
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
     user = User(

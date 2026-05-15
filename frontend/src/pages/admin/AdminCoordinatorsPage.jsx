@@ -2,13 +2,18 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   listCoordinators, createCoordinator,
-  deactivateCoordinator, activateCoordinator,
+  deactivateCoordinator, activateCoordinator, listHospitals,
 } from '../../services/adminApi'
 
 const ROLE_LABELS = {
   central_coordinator: 'Central Coordinator',
   hospital_coordinator: 'Hospital Coordinator',
+  ophthalmologist: 'Ophthalmologist',
+  nicu_nurse: 'NICU Nurse',
 }
+
+// Every role except central coordinator belongs to a specific hospital
+const ROLES_NEEDING_HOSPITAL = ['hospital_coordinator', 'ophthalmologist', 'nicu_nurse']
 
 function ConfirmDialog({ message, confirmLabel, confirmWord, onConfirm, onCancel, danger }) {
   const [typed, setTyped] = useState('')
@@ -65,6 +70,10 @@ export default function AdminCoordinatorsPage() {
     queryKey: ['admin-coordinators'],
     queryFn: listCoordinators,
   })
+  const { data: hospitals = [] } = useQuery({
+    queryKey: ['admin-hospitals'],
+    queryFn: listHospitals,
+  })
 
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ email: '', full_name: '', password: '', role: 'central_coordinator', hospital_id: '' })
@@ -113,7 +122,7 @@ export default function AdminCoordinatorsPage() {
             border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: '.85rem', fontWeight: 600,
           }}
         >
-          {showForm ? 'Cancel' : '+ Add Coordinator'}
+          {showForm ? 'Cancel' : '+ Add Account'}
         </button>
       </div>
 
@@ -123,7 +132,7 @@ export default function AdminCoordinatorsPage() {
           padding: '1.5rem', marginBottom: '1.5rem',
         }}>
           <h3 style={{ margin: '0 0 1rem', fontSize: '1rem', fontWeight: 600, color: '#0F172A' }}>
-            New Coordinator
+            New Account
           </h3>
           {formErr && (
             <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#B91C1C', borderRadius: 6, padding: '.65rem .9rem', marginBottom: '.75rem', fontSize: '.85rem' }}>
@@ -149,13 +158,25 @@ export default function AdminCoordinatorsPage() {
                 {Object.entries(ROLE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
+            {ROLES_NEEDING_HOSPITAL.includes(form.role) && (
+              <div>
+                <label style={{ display: 'block', fontSize: '.8rem', color: '#64748B', marginBottom: '.3rem' }}>Hospital</label>
+                <select className="form-input" value={form.hospital_id} onChange={e => setForm(f => ({ ...f, hospital_id: e.target.value }))}>
+                  <option value="">Select hospital…</option>
+                  {hospitals.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                </select>
+              </div>
+            )}
           </div>
           <button
-            onClick={() => createMut.mutate(form)}
+            onClick={() => createMut.mutate({
+              ...form,
+              hospital_id: form.hospital_id || undefined,
+            })}
             disabled={createMut.isPending}
             style={{ padding: '.55rem 1.25rem', background: '#3B82F6', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: '.85rem', fontWeight: 600 }}
           >
-            {createMut.isPending ? 'Creating…' : 'Create Coordinator'}
+            {createMut.isPending ? 'Creating…' : 'Create Account'}
           </button>
         </div>
       )}

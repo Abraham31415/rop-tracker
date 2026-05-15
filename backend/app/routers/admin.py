@@ -520,9 +520,10 @@ def create_coordinator(
     _: dict = Depends(_verify_admin_token),
 ):
     from app.auth.jwt import hash_password
-    allowed = [UserRole.CENTRAL_COORDINATOR.value, UserRole.HOSPITAL_COORDINATOR.value]
+    # The system administrator may create an account with any role.
+    allowed = [r.value for r in UserRole]
     if data.role not in allowed:
-        raise HTTPException(status_code=400, detail="Role must be central_coordinator or hospital_coordinator")
+        raise HTTPException(status_code=400, detail="Invalid role")
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
 

@@ -32,6 +32,11 @@ function UsersTab() {
   const qc = useQueryClient()
   const { user: me } = useAuth()
   const isCentral = me?.role === 'central_coordinator'
+  // Central coordinators may add nurses, ophthalmologists and hospital coordinators.
+  // Hospital coordinators may add NICU nurses only.
+  const creatableRoles = isCentral
+    ? ['nicu_nurse', 'ophthalmologist', 'hospital_coordinator']
+    : ['nicu_nurse']
 
   const { data: users = [], isLoading } = useQuery({ queryKey: ['users'], queryFn: listUsers })
   const { data: hospitals = [] } = useQuery({ queryKey: ['hospitals'], queryFn: listHospitals, enabled: isCentral })
@@ -83,7 +88,7 @@ function UsersTab() {
             <div className="form-group">
               <label>Role</label>
               <select className="form-input" value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
-                {Object.entries(ROLE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                {creatableRoles.map(v => <option key={v} value={v}>{ROLE_LABELS[v]}</option>)}
               </select>
             </div>
             {isCentral && (
