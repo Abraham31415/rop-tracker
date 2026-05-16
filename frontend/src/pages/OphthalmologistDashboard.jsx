@@ -162,7 +162,7 @@ export default function OphthalmologistDashboard() {
       {(loadingRequests || screeningRequests.length > 0) && (
         <div style={{ marginBottom: '1.5rem' }}>
           <div style={{
-            background: 'var(--amber-50,#fffbeb)', border: '1px solid var(--amber-200,#fde68a)',
+            background: 'var(--amber-50)', border: '1px solid var(--amber-500)',
             borderRadius: 10, padding: '1rem 1.25rem',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', marginBottom: '.75rem' }}>

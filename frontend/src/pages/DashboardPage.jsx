@@ -102,8 +102,8 @@ function BabyCard({ baby }) {
           {baby.sms_failed_recently && (
             <span style={{
               fontSize: '.68rem', fontWeight: 700,
-              background: '#FEF3C7', color: '#92400E',
-              border: '1px solid #FCD34D',
+              background: 'var(--amber-50)', color: 'var(--amber-600)',
+              border: '1px solid var(--amber-500)',
               borderRadius: 999, padding: '.1rem .45rem',
               whiteSpace: 'nowrap',
             }}>

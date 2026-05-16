@@ -35,7 +35,7 @@ function ChartTooltip({ active, payload, label, valueLabel }) {
   if (!active || !payload?.length) return null
   return (
     <div style={{
-      background: 'var(--white)', border: '1px solid var(--gray-200)',
+      background: 'var(--surface)', border: '1px solid var(--gray-200)',
       borderRadius: 'var(--radius)', padding: '.5rem .75rem',
       fontSize: '.82rem', boxShadow: 'var(--shadow-sm)',
     }}>
@@ -102,7 +102,7 @@ function BabyModal({ title, babies, loading, columns, onClose }) {
       onClick={onClose}
     >
       <div
-        style={{ background: 'var(--white)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 720, maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: 'var(--shadow-lg)' }}
+        style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 720, maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: 'var(--shadow-lg)' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -142,7 +142,7 @@ function BabyModal({ title, babies, loading, columns, onClose }) {
               </thead>
               <tbody>
                 {babies.map((b, i) => (
-                  <tr key={b.id} style={{ borderTop: '1px solid var(--gray-100)', background: i % 2 ? 'var(--gray-50)' : 'var(--white)' }}>
+                  <tr key={b.id} style={{ borderTop: '1px solid var(--gray-100)', background: i % 2 ? 'var(--gray-50)' : 'var(--surface)' }}>
                     {columns.map(c => (
                       <td key={c.key} style={{ padding: '.65rem .9rem', color: 'var(--gray-800)', whiteSpace: c.wrap ? 'normal' : 'nowrap' }}>
                         {c.render ? c.render(b) : (b[c.key] ?? '—')}
@@ -292,7 +292,7 @@ export default function AnalyticsPage() {
               borderRadius: 'var(--radius)',
               border: '1.5px solid',
               borderColor: tfKey === t.key ? 'var(--teal-600)' : 'var(--gray-200)',
-              background: tfKey === t.key ? 'var(--teal-600)' : 'var(--white)',
+              background: tfKey === t.key ? 'var(--teal-600)' : 'var(--surface)',
               color: tfKey === t.key ? 'var(--white)' : 'var(--gray-600)',
               fontWeight: 600, fontSize: '.82rem', cursor: 'pointer',
             }}

@@ -4,13 +4,20 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format, differenceInCalendarDays, addDays } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import { listAllAppointments, markAppointmentAttended, rescheduleAppointment } from '../services/api'
+import { useTheme } from '../contexts/ThemeContext'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const STATUS_META = {
+const STATUS_META_LIGHT = {
   scheduled: { label: 'Scheduled', bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' },
   missed:    { label: 'Missed',    bg: '#fff7ed', color: '#c2410c', border: '#fed7aa' },
-  ltfu:      { label: 'LTFU',      bg: 'var(--red-100)', color: 'var(--red-700)', border: '#fca5a5' },
-  attended:  { label: 'Attended',  bg: 'var(--green-100)', color: 'var(--green-700)', border: '#86efac' },
+  ltfu:      { label: 'LTFU',      bg: '#fee2e2', color: '#b91c1c', border: '#fca5a5' },
+  attended:  { label: 'Attended',  bg: '#dcfce7', color: '#15803d', border: '#86efac' },
+}
+const STATUS_META_DARK = {
+  scheduled: { label: 'Scheduled', bg: '#1e3a5f', color: '#93c5fd', border: '#2c4a70' },
+  missed:    { label: 'Missed',    bg: '#78350f', color: '#fcd34d', border: '#92400e' },
+  ltfu:      { label: 'LTFU',      bg: '#7f1d1d', color: '#fca5a5', border: '#991b1b' },
+  attended:  { label: 'Attended',  bg: '#14532d', color: '#4ade80', border: '#166534' },
 }
 
 const TODAY = new Date()
@@ -45,7 +52,7 @@ function AttendDialog({ appt, onConfirm, onCancel, isPending }) {
       background: 'rgba(0,0,0,.35)', padding: '1rem',
     }}>
       <div style={{
-        background: 'var(--white)', borderRadius: 'var(--radius)',
+        background: 'var(--surface)', borderRadius: 'var(--radius)',
         boxShadow: '0 8px 32px rgba(0,0,0,.18)', padding: '1.5rem',
         maxWidth: 420, width: '100%',
       }}>
@@ -97,6 +104,9 @@ function ApptCard({ appt, canAct, isCentral, onAttend, onRescheduleSuccess, quer
     },
   })
 
+  const { resolved } = useTheme()
+  const dark = resolved === 'dark'
+  const STATUS_META = dark ? STATUS_META_DARK : STATUS_META_LIGHT
   const st = STATUS_META[appt.status] || STATUS_META.scheduled
   const dueDate = new Date(appt.due_date + 'T00:00:00')
   const daysOff = differenceInCalendarDays(dueDate, TODAY)
@@ -114,7 +124,7 @@ function ApptCard({ appt, canAct, isCentral, onAttend, onRescheduleSuccess, quer
 
   return (
     <div style={{
-      background: 'var(--white)', borderRadius: 'var(--radius)',
+      background: 'var(--surface)', borderRadius: 'var(--radius)',
       border: `1px solid var(--gray-200)`,
       borderLeft: `4px solid ${st.border}`,
       padding: '1rem 1.125rem', display: 'flex', flexDirection: 'column', gap: '.6rem',
@@ -155,8 +165,12 @@ function ApptCard({ appt, canAct, isCentral, onAttend, onRescheduleSuccess, quer
         </span>
         <span style={{
           fontSize: '.75rem', fontWeight: 600, padding: '.1rem .45rem', borderRadius: 999,
-          background: daysOff < 0 ? 'var(--red-100)' : daysOff === 0 ? '#fef3c7' : 'var(--green-50)',
-          color: daysOff < 0 ? 'var(--red-700)' : daysOff === 0 ? '#92400e' : 'var(--green-700)',
+          background: daysOff < 0
+            ? (dark ? '#7f1d1d' : '#fee2e2')
+            : daysOff === 0 ? (dark ? '#78350f' : '#fef3c7') : (dark ? '#14532d' : '#f0fdf4'),
+          color: daysOff < 0
+            ? (dark ? '#fca5a5' : '#b91c1c')
+            : daysOff === 0 ? (dark ? '#fcd34d' : '#92400e') : (dark ? '#4ade80' : '#15803d'),
         }}>
           {dueLine}
         </span>
@@ -216,10 +230,10 @@ function ApptCard({ appt, canAct, isCentral, onAttend, onRescheduleSuccess, quer
       {/* Inline reschedule form */}
       {rescheduleOpen && (
         <div style={{
-          padding: '.75rem', background: '#eff6ff', borderRadius: 'var(--radius-sm)',
-          border: '1px solid #bfdbfe', display: 'flex', flexDirection: 'column', gap: '.6rem',
+          padding: '.75rem', background: dark ? '#15233f' : '#eff6ff', borderRadius: 'var(--radius-sm)',
+          border: `1px solid ${dark ? '#1e3a5f' : '#bfdbfe'}`, display: 'flex', flexDirection: 'column', gap: '.6rem',
         }}>
-          <div style={{ fontSize: '.75rem', fontWeight: 700, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+          <div style={{ fontSize: '.75rem', fontWeight: 700, color: dark ? '#93c5fd' : '#1d4ed8', textTransform: 'uppercase', letterSpacing: '.06em' }}>
             Reschedule
           </div>
           <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap' }}>

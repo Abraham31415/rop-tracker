@@ -281,6 +281,7 @@ function TemplatesTab() {
 
 // ── SMS Gateway tab ──────────────────────────────────────────────────────────
 function GatewayTab() {
+  const dark = useTheme().resolved === 'dark'
   const qc = useQueryClient()
   const [testPhone, setTestPhone] = useState('')
   const [testResult, setTestResult] = useState(null)
@@ -335,8 +336,10 @@ function GatewayTab() {
                 </span>
                 <span style={{
                   padding: '.3rem .85rem', borderRadius: 999, fontSize: '.82rem', fontWeight: 700,
-                  background: status.configured ? '#eff6ff' : '#fef3c7',
-                  color: status.configured ? '#1d4ed8' : '#92400e',
+                  background: status.configured
+                    ? (dark ? '#15233f' : '#eff6ff') : (dark ? '#78350f' : '#fef3c7'),
+                  color: status.configured
+                    ? (dark ? '#93c5fd' : '#1d4ed8') : (dark ? '#fcd34d' : '#92400e'),
                 }}>
                   {status.configured ? 'Credentials set' : 'No API key'}
                 </span>
@@ -391,8 +394,9 @@ function GatewayTab() {
         {!isLoading && status?.mode === 'simulate' && (
           <div style={{
             marginTop: '1rem', padding: '.65rem .9rem',
-            background: '#fef3c7', borderRadius: 'var(--radius-sm)', border: '1px solid #fcd34d',
-            fontSize: '.82rem', color: '#92400e', lineHeight: 1.5,
+            background: dark ? '#78350f' : '#fef3c7', borderRadius: 'var(--radius-sm)',
+            border: `1px solid ${dark ? '#92400e' : '#fcd34d'}`,
+            fontSize: '.82rem', color: dark ? '#fcd34d' : '#92400e', lineHeight: 1.5,
           }}>
             <strong>Simulation mode is on.</strong> The scheduler creates Reminder records and
             logs messages, but no SMS is sent. Set <code>AT_SIMULATE=False</code> in your
@@ -434,18 +438,20 @@ function GatewayTab() {
         {testResult && (
           <div style={{
             marginTop: '.9rem', padding: '.65rem .9rem', borderRadius: 'var(--radius-sm)', border: '1px solid',
-            borderColor: testResult.success ? '#86efac' : '#fca5a5',
-            background: testResult.success ? 'var(--green-50)' : '#fef2f2',
+            borderColor: testResult.success
+              ? (dark ? '#14532d' : '#86efac') : (dark ? '#7f1d1d' : '#fca5a5'),
+            background: testResult.success
+              ? (dark ? '#0f2d1f' : '#f0fdf4') : (dark ? '#3b1212' : '#fef2f2'),
             fontSize: '.83rem', lineHeight: 1.5,
           }}>
             {testResult.success ? (
-              <div style={{ color: 'var(--green-700)' }}>
+              <div style={{ color: dark ? '#4ade80' : 'var(--green-700)' }}>
                 <strong>Sent successfully.</strong>
                 {testResult.message_id && <> Message ID: <code>{testResult.message_id}</code>.</>}
                 {testResult.cost && <> Cost: {testResult.cost}.</>}
               </div>
             ) : (
-              <div style={{ color: 'var(--red-700)' }}>
+              <div style={{ color: dark ? '#fca5a5' : 'var(--red-700)' }}>
                 <strong>Failed.</strong> {testResult.error}
               </div>
             )}

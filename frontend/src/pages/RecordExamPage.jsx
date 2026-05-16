@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getBaby, listExams, recordExam } from '../services/api'
+import { useTheme } from '../contexts/ThemeContext'
 import { format, addWeeks } from 'date-fns'
 
 // ── ROP scheduling logic ──────────────────────────────────────────────────────
@@ -130,8 +131,11 @@ function VFToggleRow({ label, opts, value, onChange, compact }) {
 function VFEyePanel({ side, vf, setVf }) {
   const p = side
   const label = side === 'right' ? 'Right Eye (OD)' : 'Left Eye (OS)'
+  const { resolved } = useTheme()
   const accentColor = side === 'right' ? '#2563eb' : '#16a34a'
-  const bgColor = side === 'right' ? '#eff6ff' : '#f0fdf4'
+  const bgColor = resolved === 'dark'
+    ? (side === 'right' ? '#15233f' : '#0e2417')
+    : (side === 'right' ? '#eff6ff' : '#f0fdf4')
 
   return (
     <div style={{ flex: 1, minWidth: 260, background: bgColor, borderRadius: 'var(--radius)', padding: '1rem', borderTop: `3px solid ${accentColor}` }}>

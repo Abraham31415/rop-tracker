@@ -135,7 +135,7 @@ function PopulationReportPanel({ hospitals, isCentral }) {
                 cursor: 'pointer',
                 border: '1.5px solid',
                 transition: 'all .15s',
-                background: preset === p.value ? 'var(--teal-600)' : 'var(--white)',
+                background: preset === p.value ? 'var(--teal-600)' : 'var(--surface)',
                 color: preset === p.value ? 'var(--white)' : 'var(--gray-700)',
                 borderColor: preset === p.value ? 'var(--teal-600)' : 'var(--gray-300)',
               }}

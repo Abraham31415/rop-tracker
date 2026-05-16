@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { getNetworkOverview } from '../services/api'
+import { useTheme } from '../contexts/ThemeContext'
 import { format, startOfWeek, endOfWeek } from 'date-fns'
 
 // ── Static fallback for when API is offline ───────────────────────────────────
@@ -32,7 +33,7 @@ const TRIGGER_META = {
   t_minus_3: { label: '3 Days Before',   color: 'var(--teal-600)',   bg: 'var(--teal-50)'   },
   t_minus_1: { label: '1 Day Before',    color: 'var(--amber-600)',  bg: 'var(--amber-50)'  },
   day_of:    { label: 'Day Of',          color: 'var(--red-600)',    bg: 'var(--red-50)'    },
-  ltfu_48h:  { label: 'LTFU Alert',      color: 'var(--red-700)',    bg: '#fee2e2'          },
+  ltfu_48h:  { label: 'LTFU Alert',      color: 'var(--red-600)',    bg: 'var(--red-50)'    },
 }
 
 function pct(n, total) {
@@ -131,6 +132,7 @@ function ReminderRow({ item }) {
 
 // ── Main page ────────────────────────────────────────────────────────────────
 export default function NetworkDashboardPage() {
+  const { resolved } = useTheme()
   const { data, isLoading, error } = useQuery({
     queryKey: ['network-overview'],
     queryFn: getNetworkOverview,
@@ -310,7 +312,7 @@ export default function NetworkDashboardPage() {
                       <td />
                       <td style={{ textAlign: 'center', padding: '.75rem 1rem', color: 'var(--gray-900)' }}>{summary.total_babies}</td>
                       <td style={{ textAlign: 'center', padding: '.75rem 1rem', color: 'var(--red-700)' }}>{summary.total_ltfu}</td>
-                      <td style={{ textAlign: 'center', padding: '.75rem 1rem', color: '#92400e' }}>{summary.total_due_today}</td>
+                      <td style={{ textAlign: 'center', padding: '.75rem 1rem', color: 'var(--amber-600)' }}>{summary.total_due_today}</td>
                       <td style={{ textAlign: 'center', padding: '.75rem 1rem', color: 'var(--amber-600)' }}>{summary.total_due_soon}</td>
                       <td style={{ textAlign: 'center', padding: '.75rem 1rem', color: 'var(--green-700)' }}>{summary.total_on_track}</td>
                       <td style={{ padding: '.75rem 1rem' }}>
@@ -366,7 +368,14 @@ export default function NetworkDashboardPage() {
             </div>
 
             {/* LTFU spotlight */}
-            <div className="card" style={{ background: summary.total_ltfu > 0 ? 'linear-gradient(135deg, #fff5f5, #fee2e2)' : 'linear-gradient(135deg, var(--green-50), #dcfce7)', border: `1px solid ${summary.total_ltfu > 0 ? '#fca5a5' : '#86efac'}` }}>
+            <div className="card" style={{
+              background: resolved === 'dark'
+                ? (summary.total_ltfu > 0 ? '#3b1212' : '#0f2d1f')
+                : (summary.total_ltfu > 0 ? 'linear-gradient(135deg, #fff5f5, #fee2e2)' : 'linear-gradient(135deg, var(--green-50), #dcfce7)'),
+              border: `1px solid ${summary.total_ltfu > 0
+                ? (resolved === 'dark' ? '#7f1d1d' : '#fca5a5')
+                : (resolved === 'dark' ? '#14532d' : '#86efac')}`,
+            }}>
               <div style={{ fontSize: '.7rem', fontWeight: 700, color: summary.total_ltfu > 0 ? 'var(--red-600)' : 'var(--green-700)', textTransform: 'uppercase', letterSpacing: '.09em', marginBottom: '.5rem' }}>
                 {summary.total_ltfu > 0 ? 'Action Required' : 'Network Health'}
               </div>

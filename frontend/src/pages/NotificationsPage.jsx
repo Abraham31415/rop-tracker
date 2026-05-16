@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { formatDistanceToNow, format } from 'date-fns'
 import { getNotifications, dismissAlert, getPendingScreeningRequests, claimScreeningRequest } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
+import { useTheme } from '../contexts/ThemeContext'
 
 const TYPE_META = {
   ltfu:      { label: 'LTFU',        cls: 'notif-ltfu',     icon: '!' },
@@ -49,6 +50,9 @@ function NotifCard({ item, onDismiss }) {
 
 function ScreeningRequestsPanel() {
   const qc = useQueryClient()
+  const { resolved } = useTheme()
+  const purpleBg = resolved === 'dark' ? '#241f3f' : '#f5f3ff'
+  const purpleText = resolved === 'dark' ? '#c4b5fd' : '#7c3aed'
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ['pending-screening-requests'],
     queryFn: getPendingScreeningRequests,
@@ -63,15 +67,15 @@ function ScreeningRequestsPanel() {
 
   return (
     <div style={{ marginBottom: '1.5rem' }}>
-      <div className="notif-section-label" style={{ color: '#7c3aed' }}>
+      <div className="notif-section-label" style={{ color: purpleText }}>
         Screening Requests ({requests.length})
       </div>
       {requests.map(req => (
         <div key={req.id} className="notif-card" style={{ borderLeft: '4px solid #7c3aed' }}>
-          <div className="notif-card-icon" style={{ background: '#f5f3ff', color: '#7c3aed' }}>🔬</div>
+          <div className="notif-card-icon" style={{ background: purpleBg, color: purpleText }}>🔬</div>
           <div className="notif-card-body">
             <div className="notif-card-header-row">
-              <span className="notif-type-badge" style={{ background: '#f5f3ff', color: '#7c3aed' }}>
+              <span className="notif-type-badge" style={{ background: purpleBg, color: purpleText }}>
                 {req.status === 'claimed' ? 'Claimed by you' : 'Pending'}
               </span>
               <span className="notif-time">{formatDistanceToNow(new Date(req.created_at), { addSuffix: true })}</span>

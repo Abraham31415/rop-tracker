@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getBaby, listExams, listReminders, logPhoneCall, listHospitals, getOutcome, upsertOutcome, listReferrals, createReferral, updateReferralStatus, updateBaby, getContactLogs, addContactNote, updateDilation, dischargeBaby, reactivateBaby, retrySMS } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
+import { useTheme } from '../contexts/ThemeContext'
 import { format, formatDistanceToNow } from 'date-fns'
 import { generateBabyFullPDF, generateSingleVisitPDF } from '../services/pdfExport'
 
@@ -125,6 +126,7 @@ function SectionHeading({ children }) {
 function ExamTimeline({ exams, baby, hospitalName }) {
   const [expanded, setExpanded] = useState({})
   const [printing, setPrinting] = useState({})
+  const dark = useTheme().resolved === 'dark'
   const toggle = id => setExpanded(p => ({ ...p, [id]: !p[id] }))
 
   const handlePrintExam = async (exam) => {
@@ -150,10 +152,10 @@ function ExamTimeline({ exams, baby, hospitalName }) {
       {exams.map((exam, idx) => {
         const sev = examSeverity(exam)
         const sevColors = {
-          critical: { dot: 'var(--red-600)',   bg: '#fef2f2', border: '#fca5a5', text: 'var(--red-700)'   },
-          high:     { dot: '#ea580c',           bg: '#fff7ed', border: '#fed7aa', text: '#c2410c'           },
-          moderate: { dot: 'var(--amber-500)',  bg: 'var(--amber-50)', border: '#fcd34d', text: 'var(--amber-600)' },
-          low:      { dot: 'var(--green-600)',  bg: 'var(--green-50)', border: '#86efac', text: 'var(--green-700)' },
+          critical: { dot: 'var(--red-600)',   bg: dark ? '#3b1212' : '#fef2f2', border: dark ? '#7f1d1d' : '#fca5a5', text: dark ? '#fca5a5' : 'var(--red-700)' },
+          high:     { dot: '#ea580c',           bg: dark ? '#3b2800' : '#fff7ed', border: dark ? '#78350f' : '#fed7aa', text: dark ? '#fdba74' : '#c2410c' },
+          moderate: { dot: 'var(--amber-500)',  bg: 'var(--amber-50)', border: dark ? '#78350f' : '#fcd34d', text: 'var(--amber-600)' },
+          low:      { dot: 'var(--green-600)',  bg: 'var(--green-50)', border: dark ? '#14532d' : '#86efac', text: dark ? '#4ade80' : 'var(--green-700)' },
         }[sev]
 
         const isOpen = expanded[exam.id]
@@ -291,6 +293,8 @@ function CallLogPanel({ babyId, onClose, onSaved }) {
   const [outcome, setOutcome] = useState('not_reached')
   const [notes, setNotes] = useState('')
   const qc = useQueryClient()
+  const dark = useTheme().resolved === 'dark'
+  const blueText = dark ? '#93c5fd' : '#1d4ed8'
 
   const mutation = useMutation({
     mutationFn: () => logPhoneCall(babyId, outcome, notes),
@@ -303,7 +307,7 @@ function CallLogPanel({ babyId, onClose, onSaved }) {
 
   return (
     <div className="call-log-panel">
-      <div style={{ fontSize: '.78rem', fontWeight: 700, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: '.75rem' }}>
+      <div style={{ fontSize: '.78rem', fontWeight: 700, color: blueText, textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: '.75rem' }}>
         Log Phone Call
       </div>
       <div style={{ display: 'flex', gap: '.5rem', marginBottom: '.75rem', flexWrap: 'wrap' }}>
@@ -319,9 +323,9 @@ function CallLogPanel({ babyId, onClose, onSaved }) {
             style={{
               padding: '.4rem .9rem', borderRadius: 999, fontSize: '.8rem', fontWeight: 600,
               cursor: 'pointer', transition: 'all .15s',
-              background: outcome === opt.value ? '#1d4ed8' : 'var(--white)',
-              color: outcome === opt.value ? 'var(--white)' : '#1d4ed8',
-              border: `1.5px solid ${outcome === opt.value ? '#1d4ed8' : '#bfdbfe'}`,
+              background: outcome === opt.value ? '#1d4ed8' : 'var(--surface)',
+              color: outcome === opt.value ? '#ffffff' : blueText,
+              border: `1.5px solid ${outcome === opt.value ? '#1d4ed8' : (dark ? '#1e3a5f' : '#bfdbfe')}`,
             }}
           >
             {opt.label}
@@ -446,7 +450,7 @@ function VisualFunctionTab({ exams }) {
             </thead>
             <tbody>
               {vfExams.map((exam, idx) => (
-                <tr key={exam.id} style={{ borderBottom: '1px solid var(--gray-100)', background: idx % 2 === 0 ? 'var(--white)' : 'var(--gray-50)' }}>
+                <tr key={exam.id} style={{ borderBottom: '1px solid var(--gray-100)', background: idx % 2 === 0 ? 'var(--surface)' : 'var(--gray-50)' }}>
                   <td style={{ padding: '.55rem .9rem', fontWeight: 700, color: 'var(--gray-800)', whiteSpace: 'nowrap' }}>
                     {format(new Date(exam.exam_date + 'T00:00:00'), 'dd MMM yyyy')}
                   </td>
@@ -743,7 +747,7 @@ function ReferralSection({ babyId, babyHospitalId, canEdit }) {
         const sc = REFERRAL_STATUS_COLORS[ref.status] || REFERRAL_STATUS_COLORS.unknown
         const isUpdating = updatingId === ref.id
         return (
-          <div key={ref.id} style={{ borderRadius: 'var(--radius-sm)', border: '1px solid var(--gray-200)', padding: '.7rem .9rem', marginBottom: '.6rem', background: 'var(--white)' }}>
+          <div key={ref.id} style={{ borderRadius: 'var(--radius-sm)', border: '1px solid var(--gray-200)', padding: '.7rem .9rem', marginBottom: '.6rem', background: 'var(--surface)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '.5rem', flexWrap: 'wrap' }}>
               <div>
                 <div style={{ fontWeight: 700, fontSize: '.84rem', color: 'var(--gray-900)' }}>
@@ -934,7 +938,7 @@ function DischargeModal({ babyId, babyName, onClose, onDischarged }) {
       padding: '1rem',
     }}>
       <div style={{
-        background: 'var(--white)', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-xl)',
+        background: 'var(--surface)', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-xl)',
         width: '100%', maxWidth: 460, padding: '1.5rem',
       }}>
         <h3 style={{ margin: '0 0 .25rem', fontSize: '1.1rem', fontWeight: 700, color: 'var(--gray-900)' }}>
@@ -1073,6 +1077,7 @@ function DilationPanel({ babyId, baby, canEdit }) {
 // ── Unified contact log (reminders + contact_logs merged) ─────────────────────
 function UnifiedContactLog({ babyId, reminders, canAddNote, canRetry, onCallClick }) {
   const qc = useQueryClient()
+  const dark = useTheme().resolved === 'dark'
   const [showNoteForm, setShowNoteForm] = useState(false)
   const [noteText, setNoteText] = useState('')
   const [showMsg, setShowMsg] = useState({})
@@ -1124,10 +1129,10 @@ function UnifiedContactLog({ babyId, reminders, canAddNote, canRetry, onCallClic
   const all = [...reminderItems, ...logItems].sort((a, b) => b.date - a.date)
 
   const LOG_TYPE_STYLE = {
-    sms:               { icon: '✉', bg: 'var(--teal-50)', color: 'var(--teal-700)', label: 'Auto-SMS' },
-    phone_call:        { icon: '☎', bg: '#eff6ff', color: '#1d4ed8', label: 'Phone Call' },
-    caregiver_edit:    { icon: '✎', bg: '#fef3c7', color: '#92400e', label: 'Edit' },
-    screening_request: { icon: '🔬', bg: '#f5f3ff', color: '#7c3aed', label: 'Screening' },
+    sms:               { icon: '✉', bg: 'var(--teal-50)', color: 'var(--teal-600)', label: 'Auto-SMS' },
+    phone_call:        { icon: '☎', bg: dark ? '#15233f' : '#eff6ff', color: dark ? '#93c5fd' : '#1d4ed8', label: 'Phone Call' },
+    caregiver_edit:    { icon: '✎', bg: dark ? '#3b2800' : '#fef3c7', color: dark ? '#fcd34d' : '#92400e', label: 'Edit' },
+    screening_request: { icon: '🔬', bg: dark ? '#241f3f' : '#f5f3ff', color: dark ? '#c4b5fd' : '#7c3aed', label: 'Screening' },
     note:              { icon: '✎', bg: 'var(--gray-100)', color: 'var(--gray-600)', label: 'Note' },
   }
 
@@ -1140,12 +1145,12 @@ function UnifiedContactLog({ babyId, reminders, canAddNote, canRetry, onCallClic
             All reminders, calls &amp; edits
           </div>
           {recentFailCount > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', marginTop: '.3rem', fontSize: '.78rem', color: '#92400E' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', marginTop: '.3rem', fontSize: '.78rem', color: dark ? '#fcd34d' : '#92400E' }}>
               <span>⚠</span>
               <span>
-                {recentFailCount} SMS failed recently —{' '}
+                {recentFailCount} SMS failed recently:{' '}
                 {onCallClick
-                  ? <button onClick={onCallClick} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2563EB', fontWeight: 600, padding: 0, fontSize: 'inherit', textDecoration: 'underline' }}>call the parent directly</button>
+                  ? <button onClick={onCallClick} style={{ background: 'none', border: 'none', cursor: 'pointer', color: dark ? '#93c5fd' : '#2563EB', fontWeight: 600, padding: 0, fontSize: 'inherit', textDecoration: 'underline' }}>call the parent directly</button>
                   : 'consider calling the parent directly'
                 }
               </span>
