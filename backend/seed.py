@@ -25,25 +25,25 @@ db = SessionLocal()
 hospitals_data = [
 
     # ── National Referral Hospitals ──────────────────────────────────────────
-    {"name": "Mulago National Referral Hospital",    "district": "Kampala",  "region": "Central"},
-    {"name": "Kiruddu National Referral Hospital",   "district": "Kampala",  "region": "Central"},
-    {"name": "Kawempe National Referral Hospital",   "district": "Kampala",  "region": "Central"},
+    {"name": "Mulago National Referral Hospital",    "district": "Kampala",  "region": "Central",    "hospital_code": "MNR"},
+    {"name": "Kiruddu National Referral Hospital",   "district": "Kampala",  "region": "Central",    "hospital_code": "KDR"},
+    {"name": "Kawempe National Referral Hospital",   "district": "Kampala",  "region": "Central",    "hospital_code": "KNR"},
 
     # ── Regional Referral Hospitals (14) ─────────────────────────────────────
-    {"name": "Arua Regional Referral Hospital",      "district": "Arua",     "region": "West Nile"},
-    {"name": "Fort Portal Regional Referral Hospital","district": "Kabarole", "region": "Western"},
-    {"name": "Gulu Regional Referral Hospital",      "district": "Gulu",     "region": "Northern"},
-    {"name": "Hoima Regional Referral Hospital",     "district": "Hoima",    "region": "Western"},
-    {"name": "Jinja Regional Referral Hospital",     "district": "Jinja",    "region": "Eastern"},
-    {"name": "Kabale Regional Referral Hospital",    "district": "Kabale",   "region": "Western"},
-    {"name": "Lira Regional Referral Hospital",      "district": "Lira",     "region": "Northern"},
-    {"name": "Masaka Regional Referral Hospital",    "district": "Masaka",   "region": "Central"},
-    {"name": "Mbarara Regional Referral Hospital",   "district": "Mbarara",  "region": "Western"},
+    {"name": "Arua Regional Referral Hospital",      "district": "Arua",     "region": "West Nile",  "hospital_code": "ARR"},
+    {"name": "Fort Portal Regional Referral Hospital","district": "Kabarole", "region": "Western",    "hospital_code": "FPR"},
+    {"name": "Gulu Regional Referral Hospital",      "district": "Gulu",     "region": "Northern",   "hospital_code": "GRR"},
+    {"name": "Hoima Regional Referral Hospital",     "district": "Hoima",    "region": "Western",    "hospital_code": "HRR"},
+    {"name": "Jinja Regional Referral Hospital",     "district": "Jinja",    "region": "Eastern",    "hospital_code": "JRR"},
+    {"name": "Kabale Regional Referral Hospital",    "district": "Kabale",   "region": "Western",    "hospital_code": "KBR"},
+    {"name": "Lira Regional Referral Hospital",      "district": "Lira",     "region": "Northern",   "hospital_code": "LRR"},
+    {"name": "Masaka Regional Referral Hospital",    "district": "Masaka",   "region": "Central",    "hospital_code": "MKR"},
+    {"name": "Mbarara Regional Referral Hospital",   "district": "Mbarara",  "region": "Western",    "hospital_code": "MBR"},
     {"name": "Mbale Regional Referral Hospital",     "district": "Mbale",    "region": "Eastern"},
-    {"name": "Moroto Regional Referral Hospital",    "district": "Moroto",   "region": "Karamoja"},
+    {"name": "Moroto Regional Referral Hospital",    "district": "Moroto",   "region": "Karamoja",   "hospital_code": "MTR"},
     {"name": "Mubende Regional Referral Hospital",   "district": "Mubende",  "region": "Central"},
     {"name": "Rukungiri Regional Referral Hospital", "district": "Rukungiri","region": "Western"},
-    {"name": "Soroti Regional Referral Hospital",    "district": "Soroti",   "region": "Eastern"},
+    {"name": "Soroti Regional Referral Hospital",    "district": "Soroti",   "region": "Eastern",    "hospital_code": "SRR"},
 
     # ── Other Government Hospitals with NICUs ────────────────────────────────
     {"name": "Entebbe Regional Referral Hospital",   "district": "Wakiso",   "region": "Central"},
@@ -100,6 +100,9 @@ for h in hospitals_data:
         hospitals[h["name"]] = obj
         added += 1
     else:
+        # Backfill hospital_code on existing rows if not already set
+        if "hospital_code" in h and not existing.hospital_code:
+            existing.hospital_code = h["hospital_code"]
         hospitals[h["name"]] = existing
 
 db.commit()

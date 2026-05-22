@@ -43,6 +43,7 @@ class Baby(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     hospital_id = Column(UUID(as_uuid=True), ForeignKey("hospitals.id"), nullable=False)
+    rop_id = Column(String(20), nullable=True, unique=True)
 
     # Identity
     full_name = Column(String, nullable=False)

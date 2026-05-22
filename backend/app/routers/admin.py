@@ -188,6 +188,7 @@ class AuditLogOut(BaseModel):
 class HospitalOut(BaseModel):
     id: UUID
     name: str
+    hospital_code: Optional[str] = None
     district: str
     region: str
     hospital_type: Optional[str]
@@ -200,8 +201,16 @@ class HospitalOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+def _validate_hospital_code(code: str) -> str:
+    """Raise ValueError if code is not exactly 3 uppercase ASCII letters."""
+    if not code or len(code) != 3 or not code.isalpha():
+        raise ValueError("Hospital code must be exactly 3 letters")
+    return code.upper()
+
+
 class HospitalCreate(BaseModel):
     name: str
+    hospital_code: str
     district: str
     region: str
     hospital_type: str
@@ -211,6 +220,7 @@ class HospitalCreate(BaseModel):
 
 class HospitalUpdate(BaseModel):
     name: Optional[str] = None
+    hospital_code: Optional[str] = None
     district: Optional[str] = None
     region: Optional[str] = None
     hospital_type: Optional[str] = None
@@ -666,6 +676,7 @@ def _hospital_out(h: Hospital, db: Session) -> HospitalOut:
     return HospitalOut(
         id=h.id,
         name=h.name,
+        hospital_code=h.hospital_code,
         district=h.district,
         region=h.region,
         hospital_type=h.hospital_type,
@@ -695,7 +706,15 @@ def create_hospital_admin(
 ):
     if db.query(Hospital).filter(Hospital.name == data.name).first():
         raise HTTPException(status_code=400, detail="A hospital with that name already exists")
-    hospital = Hospital(**data.model_dump())
+    try:
+        code = _validate_hospital_code(data.hospital_code)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    if db.query(Hospital).filter(Hospital.hospital_code == code).first():
+        raise HTTPException(status_code=400, detail=f"Hospital code '{code}' is already in use by another hospital")
+    payload = data.model_dump()
+    payload["hospital_code"] = code
+    hospital = Hospital(**payload)
     db.add(hospital)
     db.flush()
     write_audit(
@@ -728,6 +747,14 @@ def update_hospital_admin(
     if "name" in changes and changes["name"] != hospital.name:
         if db.query(Hospital).filter(Hospital.name == changes["name"]).first():
             raise HTTPException(status_code=400, detail="A hospital with that name already exists")
+    if "hospital_code" in changes:
+        try:
+            changes["hospital_code"] = _validate_hospital_code(changes["hospital_code"])
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+        if changes["hospital_code"] != hospital.hospital_code:
+            if db.query(Hospital).filter(Hospital.hospital_code == changes["hospital_code"]).first():
+                raise HTTPException(status_code=400, detail=f"Hospital code '{changes['hospital_code']}' is already in use by another hospital")
     for field, value in changes.items():
         setattr(hospital, field, value)
     write_audit(

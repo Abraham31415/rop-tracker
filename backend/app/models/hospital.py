@@ -13,6 +13,7 @@ class Hospital(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False, unique=True)
+    hospital_code = Column(String(3), nullable=True, unique=True)
     district = Column(String, nullable=False)
     region = Column(String, nullable=False)
     hospital_type = Column(String, nullable=True)

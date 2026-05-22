@@ -16,6 +16,7 @@ from app.models.reminder import Reminder
 from app.schemas.baby import BabyCreate, BabyUpdate, BabyOut, BabyDashboardItem, DilationUpdate
 from app.auth.jwt import get_current_user
 from app.utils.audit import write_audit
+from app.services.rop_id import generate_rop_id
 from pydantic import BaseModel
 from typing import Optional
 
@@ -49,6 +50,12 @@ def enroll_baby(
     baby = Baby(**baby_data, hospital_id=data.hospital_id, enrolled_by_id=current_user.id)
     db.add(baby)
     db.flush()
+
+    # Auto-generate ROP Tracker ID (only if hospital has a code set)
+    if hospital.hospital_code:
+        from datetime import datetime, timezone as _tz
+        baby.rop_id = generate_rop_id(db, hospital, datetime.now(_tz.utc).year)
+
     write_audit(
         db,
         user_id=current_user.id,
@@ -104,7 +111,8 @@ def search_babies_route(
         (Baby.full_name.ilike(like)) |
         (Baby.caregiver_name.ilike(like)) |
         (Baby.mtn_phone.ilike(like)) |
-        (Baby.airtel_phone.ilike(like))
+        (Baby.airtel_phone.ilike(like)) |
+        (Baby.rop_id.ilike(like))
     )
     if current_user.role != UserRole.CENTRAL_COORDINATOR:
         query = query.filter(Baby.hospital_id == current_user.hospital_id)
@@ -132,6 +140,7 @@ def search_babies_route(
         hospital = db.query(Hospital).filter(Hospital.id == baby.hospital_id).first()
         results.append({
             "id": str(baby.id),
+            "rop_id": baby.rop_id,
             "full_name": baby.full_name,
             "caregiver_name": baby.caregiver_name,
             "mtn_phone": baby.mtn_phone,
@@ -284,7 +293,9 @@ def dashboard_urgency(
     if q:
         like = f"%{q}%"
         query = query.filter(
-            (Baby.full_name.ilike(like)) | (Baby.caregiver_name.ilike(like))
+            (Baby.full_name.ilike(like)) |
+            (Baby.caregiver_name.ilike(like)) |
+            (Baby.rop_id.ilike(like))
         )
 
     babies = query.all()
@@ -329,6 +340,7 @@ def dashboard_urgency(
 
         items.append(BabyDashboardItem(
             id=baby.id,
+            rop_id=baby.rop_id,
             full_name=baby.full_name,
             sex=baby.sex,
             date_of_birth=baby.date_of_birth,

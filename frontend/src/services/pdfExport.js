@@ -461,11 +461,18 @@ export async function generateSingleVisitPDF(baby, exam, hospitalName) {
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(6.5)
     doc.text('Scan for digital record', PW - MR - 12, y + 27, { align: 'center' })
+    if (baby.rop_id) {
+      setTxt(doc, C.teal)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(7.5)
+      doc.text(baby.rop_id, PW - MR - 12, y + 33, { align: 'center' })
+    }
   }
 
   // ── Baby details ──
   y = sectionHeading(doc, y, 'Patient Information')
   const bdRows = [
+    ...(baby.rop_id ? [['ROP ID', baby.rop_id, 'Hospital', hospitalName || '-']] : []),
     ['Full Name', baby.full_name, 'Date of Birth', fmtDate(baby.date_of_birth)],
     ['Sex', baby.sex === 'male' ? 'Male' : 'Female', 'Gestational Age', `${baby.gestational_age_weeks} weeks`],
     ['Birth Weight', `${baby.birth_weight_grams}g`, 'Caregiver', baby.caregiver_name],
@@ -676,7 +683,17 @@ export async function generateBabyFullPDF(baby, exams, hospitalName) {
   doc.setFontSize(9)
   doc.text((baby.status || 'active').toUpperCase(), PW - MR, y, { align: 'right' })
 
-  y += 9
+  if (baby.rop_id) {
+    y += 6
+    setTxt(doc, C.teal)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.text(baby.rop_id, ML + 8, y)
+    y += 4
+  } else {
+    y += 9
+  }
+
   const infoItems = [
     ['Date of Birth', fmtDate(baby.date_of_birth)],
     ['Sex', baby.sex === 'male' ? 'Male' : 'Female'],

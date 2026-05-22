@@ -90,6 +90,11 @@ function BabyCard({ baby }) {
       <div className="baby-card-header">
         <div>
           <div className="baby-card-name">{baby.full_name}</div>
+          {baby.rop_id && (
+            <div style={{ fontFamily: 'monospace', fontSize: '.72rem', fontWeight: 700, color: 'var(--teal-600)', marginTop: '.1rem' }}>
+              {baby.rop_id}
+            </div>
+          )}
           <div className="baby-card-sub">
             {baby.sex === 'male' ? 'Male' : 'Female'}
             &nbsp;·&nbsp; DOB {format(new Date(baby.date_of_birth + 'T00:00:00'), 'dd MMM yyyy')}

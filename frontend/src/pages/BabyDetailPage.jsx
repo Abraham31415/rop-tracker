@@ -1372,6 +1372,18 @@ export default function BabyDetailPage() {
                 {st.label}
               </span>
             </div>
+            {baby.rop_id && (
+              <div style={{ marginTop: '.25rem', marginBottom: '.1rem' }}>
+                <span style={{
+                  fontFamily: 'monospace', fontSize: '.85rem', fontWeight: 700, letterSpacing: '.06em',
+                  background: 'var(--teal-50)', color: 'var(--teal-700)',
+                  border: '1px solid var(--teal-200)', borderRadius: 6,
+                  padding: '.2rem .6rem',
+                }}>
+                  {baby.rop_id}
+                </span>
+              </div>
+            )}
             <p style={{ color: 'var(--gray-500)', fontSize: '.875rem', marginTop: '.2rem' }}>
               {baby.sex === 'male' ? 'Male' : 'Female'}
               &nbsp;·&nbsp; Born {format(new Date(baby.date_of_birth + 'T00:00:00'), 'dd MMMM yyyy')}

@@ -53,6 +53,7 @@ class DilationUpdate(BaseModel):
 class BabyOut(BaseModel):
     id: UUID
     hospital_id: UUID
+    rop_id: Optional[str] = None
     full_name: str
     date_of_birth: date
     sex: Sex
@@ -85,6 +86,7 @@ class BabyOut(BaseModel):
 
 class BabyDashboardItem(BaseModel):
     id: UUID
+    rop_id: Optional[str] = None
     full_name: str
     sex: Optional[str] = None
     date_of_birth: date

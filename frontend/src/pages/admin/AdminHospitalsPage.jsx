@@ -17,7 +17,7 @@ const TYPE_LABELS = Object.fromEntries(HOSPITAL_TYPES.map(t => [t.value, t.label
 
 const EMPTY_FORM = {
   name: '', district: '', region: '', hospital_type: '',
-  physical_address: '', contact_phone: '',
+  physical_address: '', contact_phone: '', hospital_code: '',
 }
 
 // ── Shared subcomponents ──────────────────────────────────────────────────────
@@ -94,12 +94,17 @@ function HospitalForm({ initial, onSave, onCancel, saving, error }) {
   const [form, setForm] = useState(initial || EMPTY_FORM)
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  const required = ['name', 'district', 'region', 'hospital_type']
-  const canSubmit = required.every(k => form[k].trim())
+  const required = ['name', 'district', 'region', 'hospital_type', 'hospital_code']
+  const canSubmit = required.every(k => form[k].trim()) &&
+    /^[A-Za-z]{3}$/.test(form.hospital_code)
+
+  const codeUpper = form.hospital_code.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3)
+  const year = new Date().getFullYear().toString().slice(-2)
+  const codePreview = codeUpper.length === 3 ? `${codeUpper}-${year}-00001` : null
 
   function handleSubmit(e) {
     e.preventDefault()
-    const payload = { ...form }
+    const payload = { ...form, hospital_code: form.hospital_code.toUpperCase() }
     if (!payload.physical_address) delete payload.physical_address
     if (!payload.contact_phone) delete payload.contact_phone
     onSave(payload)
@@ -134,6 +139,32 @@ function HospitalForm({ initial, onSave, onCancel, saving, error }) {
               <option key={t.value} value={t.value}>{t.label}</option>
             ))}
           </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Hospital code * <span style={{ color: '#94A3B8', fontWeight: 400 }}>(3 uppercase letters)</span></label>
+          <input
+            style={{ ...fieldStyle, textTransform: 'uppercase', fontFamily: 'monospace', fontWeight: 700, letterSpacing: '.1em' }}
+            value={form.hospital_code}
+            onChange={e => set('hospital_code', e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3))}
+            placeholder="e.g. MNR"
+            maxLength={3}
+            required
+          />
+          {form.hospital_code && !/^[A-Z]{3}$/.test(form.hospital_code) && (
+            <div style={{ color: '#EF4444', fontSize: '.75rem', marginTop: '.25rem' }}>Must be exactly 3 letters</div>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+          {codePreview ? (
+            <div style={{
+              padding: '.45rem .75rem', background: '#F0FDF4', border: '1px solid #86EFAC',
+              borderRadius: 6, fontSize: '.82rem', color: '#166534',
+            }}>
+              Baby IDs will appear as: <strong style={{ fontFamily: 'monospace' }}>{codePreview}</strong>
+            </div>
+          ) : (
+            <div style={{ fontSize: '.8rem', color: '#94A3B8', fontStyle: 'italic' }}>Enter code to preview IDs</div>
+          )}
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={labelStyle}>Physical address</label>
@@ -246,6 +277,15 @@ export default function AdminHospitalsPage() {
         <td style={{ padding: '.75rem 1rem', fontSize: '.875rem', color: '#0F172A', fontWeight: 500 }}>
           {h.name}
         </td>
+        <td style={{ padding: '.75rem 1rem' }}>
+          {h.hospital_code ? (
+            <span style={{
+              fontFamily: 'monospace', fontWeight: 700, fontSize: '.8rem',
+              background: '#F0FDF4', color: '#166534', border: '1px solid #86EFAC',
+              borderRadius: 4, padding: '2px 7px',
+            }}>{h.hospital_code}</span>
+          ) : <span style={{ color: '#CBD5E1', fontSize: '.75rem' }}>—</span>}
+        </td>
         <td style={{ padding: '.75rem 1rem', fontSize: '.8rem', color: '#64748B' }}>{h.district}</td>
         <td style={{ padding: '.75rem 1rem', fontSize: '.8rem', color: '#64748B' }}>{h.region}</td>
         <td style={{ padding: '.75rem 1rem', fontSize: '.8rem', color: '#64748B' }}>
@@ -292,6 +332,7 @@ export default function AdminHospitalsPage() {
           <thead>
             <tr>
               <th style={thStyle}>Name</th>
+              <th style={thStyle}>Code</th>
               <th style={thStyle}>District</th>
               <th style={thStyle}>Region</th>
               <th style={thStyle}>Type</th>
@@ -315,6 +356,7 @@ export default function AdminHospitalsPage() {
 
   const formInitial = showForm && showForm !== 'create' ? {
     name: showForm.hospital.name,
+    hospital_code: showForm.hospital.hospital_code || '',
     district: showForm.hospital.district,
     region: showForm.hospital.region,
     hospital_type: showForm.hospital.hospital_type || '',

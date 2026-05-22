@@ -62,7 +62,8 @@ export default function AllBabiesPage() {
       const lq = q.toLowerCase()
       list = list.filter(b =>
         b.full_name?.toLowerCase().includes(lq) ||
-        b.caregiver_name?.toLowerCase().includes(lq)
+        b.caregiver_name?.toLowerCase().includes(lq) ||
+        b.rop_id?.toLowerCase().includes(lq)
       )
     }
     return list
@@ -89,7 +90,7 @@ export default function AllBabiesPage() {
           </svg>
           <input
             className="filter-search"
-            placeholder="Search by baby name or caregiver…"
+            placeholder="Search by name, caregiver, or ROP ID…"
             value={q}
             onChange={e => setQ(e.target.value)}
           />
@@ -133,6 +134,7 @@ export default function AllBabiesPage() {
             <thead>
               <tr>
                 <th>Baby</th>
+                <th>ROP ID</th>
                 <th>Caregiver / Phone</th>
                 {isCentral && <th>Hospital</th>}
                 <th>GA / Weight</th>
@@ -159,6 +161,16 @@ export default function AllBabiesPage() {
                       <div className="table-baby-sub">
                         {b.sex === 'male' ? 'M' : 'F'} · DOB {b.date_of_birth ? format(new Date(b.date_of_birth + 'T00:00:00'), 'dd MMM yy') : '-'}
                       </div>
+                    </td>
+                    <td>
+                      {b.rop_id ? (
+                        <span style={{
+                          fontFamily: 'monospace', fontSize: '.78rem', fontWeight: 700,
+                          background: 'var(--teal-50)', color: 'var(--teal-700)',
+                          border: '1px solid var(--teal-200)', borderRadius: 4,
+                          padding: '2px 6px', whiteSpace: 'nowrap',
+                        }}>{b.rop_id}</span>
+                      ) : <span style={{ color: 'var(--gray-300)', fontSize: '.75rem' }}>—</span>}
                     </td>
                     <td>
                       <div style={{ fontWeight: 500, fontSize: '.85rem' }}>{b.caregiver_name}</div>
