@@ -456,37 +456,38 @@ async function qrDataUrlBW(url) {
 }
 
 function bwFooter(doc, pageNum, totalPages) {
-  const fy = PH - 10
+  const lineY = PH - 15   // rule at 282 mm
+  const textY = PH - 7    // baseline at 290 mm
   setDraw(doc, BW.border)
   doc.setLineWidth(0.3)
-  doc.line(ML, fy, PW - MR, fy)
+  doc.line(ML, lineY, PW - MR, lineY)
   setTxt(doc, BW.label)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(8)
-  doc.text('ROP Tracker Uganda', ML, fy + 4)
-  doc.text('CONFIDENTIAL: For clinical use only', PW / 2, fy + 4, { align: 'center' })
-  doc.text(`Page ${pageNum} of ${totalPages}`, PW - MR, fy + 4, { align: 'right' })
+  doc.setFont('times', 'normal')
+  doc.setFontSize(12)
+  doc.text('ROP Tracker Uganda', ML, textY)
+  doc.text('CONFIDENTIAL: For clinical use only', PW / 2, textY, { align: 'center' })
+  doc.text(`Page ${pageNum} of ${totalPages}`, PW - MR, textY, { align: 'right' })
 }
 
-// Bold helvetica uppercase heading + thin black underline; returns y after heading
+// Bold Times uppercase heading + thin black underline; returns y after heading
 function bwSectionHeading(doc, y, title) {
   setTxt(doc, BW.black)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(9)
+  doc.setFont('times', 'bold')
+  doc.setFontSize(12)
   doc.text(title.toUpperCase(), ML, y + 5)
   setDraw(doc, BW.black)
   doc.setLineWidth(0.4)
-  doc.line(ML, y + 7, ML + CW, y + 7)
-  return y + 13
+  doc.line(ML, y + 8, ML + CW, y + 8)
+  return y + 15
 }
 
-// autoTable wrapper: times body, helvetica head, black borders, F5F5F5 alt rows
+// autoTable wrapper: Times 12pt body AND head, black borders, F5F5F5 alt rows
 function bwTable(doc, opts) {
   autoTable(doc, {
     ...opts,
     styles: {
       font: 'times',
-      fontSize: 10,
+      fontSize: 12,
       textColor: BW.black,
       cellPadding: 2.5,
       lineColor: BW.border,
@@ -497,7 +498,7 @@ function bwTable(doc, opts) {
       fillColor: BW.white,
       textColor: BW.black,
       fontStyle: 'bold',
-      font: 'helvetica',
+      font: 'times',
       lineColor: BW.black,
       lineWidth: 0.4,
       ...(opts.headStyles || {}),
@@ -539,7 +540,7 @@ function addVFSectionBW(doc, exam, yStart) {
       margin: { left: ML, right: MR },
       head: [['Finding', 'Right Eye (OD)', 'Left Eye (OS)']],
       body: rows,
-      styles: { fontSize: 9, cellPadding: 2.5 },
+      styles: { fontSize: 12, cellPadding: 2.5 },
       columnStyles: { 0: { fontStyle: 'bold', cellWidth: 45 } },
     })
     y = doc.lastAutoTable.finalY + 4
@@ -555,7 +556,7 @@ function addVFSectionBW(doc, exam, yStart) {
       startY: y,
       margin: { left: ML, right: MR },
       body: binocular,
-      styles: { fontSize: 9, cellPadding: 2.5 },
+      styles: { fontSize: 12, cellPadding: 2.5 },
       columnStyles: { 0: { fontStyle: 'bold', cellWidth: 55 } },
     })
     y = doc.lastAutoTable.finalY + 4
@@ -564,10 +565,10 @@ function addVFSectionBW(doc, exam, yStart) {
   if (exam.vf_notes) {
     setTxt(doc, BW.black)
     doc.setFont('times', 'italic')
-    doc.setFontSize(9)
+    doc.setFontSize(12)
     const lines = doc.splitTextToSize(exam.vf_notes, CW - 6)
     doc.text(lines, ML + 3, y)
-    y += lines.length * 4.5 + 4
+    y += lines.length * 6 + 4
   }
 
   return y
@@ -582,40 +583,47 @@ export async function generateSingleVisitPDF(baby, exam, hospitalName) {
   const qr = await qrDataUrlBW(babyUrl)
 
   // ── Header: text left, QR right ───────────────────────────────────────────
+  // QR: top=5, size=24 → bottom=29; caption baseline=37; rop_id=44; divider=51
   const QR_SIZE = 24
+  const QR_TOP  = 5
   const qrX = PW - MR - QR_SIZE
 
+  // Left text — all Times 12pt, 7 mm line spacing
   setTxt(doc, BW.black)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(16)
-  doc.text('ROP Tracker Uganda', ML, 12)
+  doc.setFont('times', 'bold')
+  doc.setFontSize(12)
+  doc.text('ROP SCREENING RECORD', ML, 13)
 
   setTxt(doc, BW.label)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.text(hospitalName || 'Uganda ROP Network', ML, 18)
-  doc.text('Retinal Examination Report', ML, 24)
-  doc.text(`Generated: ${fmtNow()}`, ML, 30)
+  doc.setFont('times', 'normal')
+  doc.setFontSize(12)
+  doc.text('Retinopathy of Prematurity Follow-Up Network', ML, 20)
+  doc.text(hospitalName || 'Uganda ROP Network', ML, 27)
+  doc.text(`Generated: ${fmtNow()}`, ML, 34)
 
+  // QR + caption — all above divider
   if (qr) {
-    doc.addImage(qr, 'PNG', qrX, 4, QR_SIZE, QR_SIZE)
+    doc.addImage(qr, 'PNG', qrX, QR_TOP, QR_SIZE, QR_SIZE)
+    // 4 mm visual gap below QR image; caption baseline = QR_TOP + QR_SIZE + 8
+    const captionY = QR_TOP + QR_SIZE + 8   // = 37
     setTxt(doc, BW.label)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(7)
-    doc.text('Scan for digital record', qrX + QR_SIZE / 2, 31, { align: 'center' })
+    doc.setFont('times', 'normal')
+    doc.setFontSize(12)
+    doc.text('Scan for digital record', qrX + QR_SIZE / 2, captionY, { align: 'center' })
     if (baby.rop_id) {
       setTxt(doc, BW.black)
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(8)
-      doc.text(baby.rop_id, qrX + QR_SIZE / 2, 37, { align: 'center' })
+      doc.setFont('times', 'bold')
+      doc.setFontSize(12)
+      doc.text(baby.rop_id, qrX + QR_SIZE / 2, captionY + 7, { align: 'center' })
     }
   }
 
+  // Divider — sits below all header elements on both sides
   setDraw(doc, BW.black)
   doc.setLineWidth(0.5)
-  doc.line(ML, 39, PW - MR, 39)
+  doc.line(ML, 51, PW - MR, 51)
 
-  let y = 46
+  let y = 59
 
   // ── Patient Information ───────────────────────────────────────────────────
   y = bwSectionHeading(doc, y, 'Patient Information')
@@ -631,11 +639,11 @@ export async function generateSingleVisitPDF(baby, exam, hospitalName) {
     startY: y,
     margin: { left: ML, right: MR },
     body: bdRows,
-    styles: { fontSize: 10, cellPadding: 2.5 },
+    styles: { fontSize: 12, cellPadding: 2.5 },
     columnStyles: {
-      0: { font: 'helvetica', fontStyle: 'bold', fontSize: 8, textColor: BW.label, cellWidth: 38 },
+      0: { font: 'times', fontStyle: 'bold', fontSize: 12, textColor: BW.label, cellWidth: 38 },
       1: { cellWidth: 52 },
-      2: { font: 'helvetica', fontStyle: 'bold', fontSize: 8, textColor: BW.label, cellWidth: 38 },
+      2: { font: 'times', fontStyle: 'bold', fontSize: 12, textColor: BW.label, cellWidth: 38 },
       3: { cellWidth: 'auto' },
     },
   })
@@ -652,17 +660,17 @@ export async function generateSingleVisitPDF(baby, exam, hospitalName) {
   ]
   const activeRisks = risks.filter(r => r[1]).map(r => r[0])
   doc.setFont('times', 'normal')
-  doc.setFontSize(10)
+  doc.setFontSize(12)
   if (activeRisks.length) {
     setTxt(doc, BW.black)
     for (const risk of activeRisks) {
       doc.text(`•  ${risk}`, ML + 3, y)
-      y += 5.5
+      y += 6
     }
   } else {
     setTxt(doc, BW.label)
     doc.text('No risk factors recorded', ML + 3, y)
-    y += 5.5
+    y += 6
   }
   y += 5
 
@@ -676,7 +684,7 @@ export async function generateSingleVisitPDF(baby, exam, hospitalName) {
       ['Right Eye (OD)', ZONE_LABELS[exam.right_zone] || '-', STAGE_LABELS[exam.right_stage] || '-', PLUS_LABELS[exam.right_plus] || 'None'],
       ['Left Eye (OS)',  ZONE_LABELS[exam.left_zone]  || '-', STAGE_LABELS[exam.left_stage]  || '-', PLUS_LABELS[exam.left_plus]  || 'None'],
     ],
-    styles: { fontSize: 10, cellPadding: 3 },
+    styles: { fontSize: 12, cellPadding: 3 },
     columnStyles: { 0: { fontStyle: 'bold' } },
   })
   y = doc.lastAutoTable.finalY + 5
@@ -685,19 +693,19 @@ export async function generateSingleVisitPDF(baby, exam, hospitalName) {
     ? `Worst Finding: ${ZONE_LABELS[exam.worst_zone] || exam.worst_zone} / ${STAGE_LABELS[exam.worst_stage] || '-'}${exam.has_plus_disease === 'yes' ? ' + Plus Disease' : ''}`
     : 'Worst Finding: No ROP recorded'
   setTxt(doc, BW.black)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(10)
-  doc.text(worstStr, ML + 3, y + 5)
-  y += 13
+  doc.setFont('times', 'bold')
+  doc.setFontSize(12)
+  doc.text(worstStr, ML + 3, y + 6)
+  y += 14
 
   // ── Treatment ─────────────────────────────────────────────────────────────
   if (exam.treatment_recommended) {
     y = bwSectionHeading(doc, y, 'Treatment Recommended')
     setTxt(doc, BW.black)
     doc.setFont('times', 'bold')
-    doc.setFontSize(10)
+    doc.setFontSize(12)
     doc.text(TREATMENT_LABELS[exam.treatment_recommended] || exam.treatment_recommended, ML + 3, y)
-    y += 11
+    y += 12
   }
 
   // ── Next Appointment ──────────────────────────────────────────────────────
@@ -705,9 +713,9 @@ export async function generateSingleVisitPDF(baby, exam, hospitalName) {
     y = bwSectionHeading(doc, y, 'Next Appointment')
     setTxt(doc, BW.black)
     doc.setFont('times', 'normal')
-    doc.setFontSize(10)
+    doc.setFontSize(12)
     doc.text(`Return in ${exam.next_exam_weeks} week${exam.next_exam_weeks > 1 ? 's' : ''} for next examination`, ML + 3, y)
-    y += 11
+    y += 12
   }
 
   // ── Clinical Notes ────────────────────────────────────────────────────────
@@ -715,10 +723,10 @@ export async function generateSingleVisitPDF(baby, exam, hospitalName) {
     y = bwSectionHeading(doc, y, 'Clinical Notes')
     setTxt(doc, BW.black)
     doc.setFont('times', 'normal')
-    doc.setFontSize(10)
+    doc.setFontSize(12)
     const lines = doc.splitTextToSize(exam.notes, CW - 6)
     doc.text(lines, ML + 3, y)
-    y += lines.length * 5 + 6
+    y += lines.length * 6 + 6
   }
 
   // ── Visual Function ───────────────────────────────────────────────────────
@@ -727,7 +735,7 @@ export async function generateSingleVisitPDF(baby, exam, hospitalName) {
   }
 
   // ── Signature block ───────────────────────────────────────────────────────
-  y = Math.max(y + 8, PH - 52)
+  y = Math.max(y + 8, PH - 55)
   const sigCols = [ML, ML + CW / 3, ML + (CW / 3) * 2]
   const sigW = CW / 3 - 4
   const sigLabels = ['Examined by (Print Name)', 'Signature', 'Date']
@@ -736,9 +744,9 @@ export async function generateSingleVisitPDF(baby, exam, hospitalName) {
   for (let i = 0; i < 3; i++) {
     doc.line(sigCols[i], y + 15, sigCols[i] + sigW, y + 15)
     setTxt(doc, BW.label)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8)
-    doc.text(sigLabels[i], sigCols[i], y + 21)
+    doc.setFont('times', 'normal')
+    doc.setFontSize(12)
+    doc.text(sigLabels[i], sigCols[i], y + 22)
   }
 
   bwFooter(doc, 1, 1)
@@ -757,67 +765,70 @@ export async function generateBabyFullPDF(baby, exams, hospitalName) {
   const totalPages = sortedExams.length + 1
 
   // ── COVER ─────────────────────────────────────────────────────────────────
+  // QR: top=5, size=26 → bottom=31; caption baseline=39; divider=51
   const QR_SIZE = 26
+  const QR_TOP  = 5
   const qrX = PW - MR - QR_SIZE
 
+  // Left text — all Times 12pt, 7 mm line spacing
   setTxt(doc, BW.black)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(18)
-  doc.text('ROP Tracker Uganda', ML, 14)
+  doc.setFont('times', 'bold')
+  doc.setFontSize(12)
+  doc.text('ROP SCREENING RECORD', ML, 13)
 
   setTxt(doc, BW.label)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.text('Complete Clinical Record: All Examinations', ML, 20)
-  doc.text(hospitalName || '', ML, 26)
+  doc.setFont('times', 'normal')
+  doc.setFontSize(12)
+  doc.text('Retinopathy of Prematurity Follow-Up Network', ML, 20)
+  doc.text(hospitalName || '', ML, 27)
 
+  // QR + caption — fully above divider
   if (qr) {
-    doc.addImage(qr, 'PNG', qrX, 4, QR_SIZE, QR_SIZE)
+    doc.addImage(qr, 'PNG', qrX, QR_TOP, QR_SIZE, QR_SIZE)
+    const captionY = QR_TOP + QR_SIZE + 8   // = 39
     setTxt(doc, BW.label)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(7)
-    doc.text('Scan for digital record', qrX + QR_SIZE / 2, 33, { align: 'center' })
+    doc.setFont('times', 'normal')
+    doc.setFontSize(12)
+    doc.text('Scan for digital record', qrX + QR_SIZE / 2, captionY, { align: 'center' })
   }
 
   setDraw(doc, BW.black)
   doc.setLineWidth(0.7)
-  doc.line(ML, 32, PW - MR, 32)
+  doc.line(ML, 51, PW - MR, 51)
 
-  let y = 40
+  let y = 59
 
   // Baby name and status
   setTxt(doc, BW.black)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(16)
+  doc.setFont('times', 'bold')
+  doc.setFontSize(12)
   doc.text(baby.full_name, ML, y)
 
   const statusText = STATUS_LABELS_BW[baby.status] || '[ACTIVE]'
-  doc.setFontSize(10)
   doc.text(statusText, PW - MR, y, { align: 'right' })
 
   y += 7
   if (baby.rop_id) {
-    doc.setFontSize(11)
     doc.text(baby.rop_id, ML, y)
     y += 8
   }
 
   // Patient details table
   const patientRows = [
-    ['Date of Birth',   fmtDate(baby.date_of_birth),         'Sex',         baby.sex === 'male' ? 'Male' : 'Female'],
-    ['Gestational Age', `${baby.gestational_age_weeks}w`,    'Birth Weight', `${baby.birth_weight_grams}g`],
-    ['Caregiver',       baby.caregiver_name,                  'Phone',        baby.mtn_phone || baby.airtel_phone || '-'],
-    ['Total Exams',     String(sortedExams.length),           'Enrolled',     fmtDate(baby.enrolled_at?.split('T')[0] || '')],
+    ['Date of Birth',   fmtDate(baby.date_of_birth),       'Sex',         baby.sex === 'male' ? 'Male' : 'Female'],
+    ['Gestational Age', `${baby.gestational_age_weeks}w`,  'Birth Weight', `${baby.birth_weight_grams}g`],
+    ['Caregiver',       baby.caregiver_name,                'Phone',        baby.mtn_phone || baby.airtel_phone || '-'],
+    ['Total Exams',     String(sortedExams.length),         'Enrolled',     fmtDate(baby.enrolled_at?.split('T')[0] || '')],
   ]
   bwTable(doc, {
     startY: y,
     margin: { left: ML, right: MR },
     body: patientRows,
-    styles: { fontSize: 10, cellPadding: 2.5 },
+    styles: { fontSize: 12, cellPadding: 2.5 },
     columnStyles: {
-      0: { font: 'helvetica', fontStyle: 'bold', fontSize: 8, textColor: BW.label, cellWidth: 40 },
+      0: { font: 'times', fontStyle: 'bold', fontSize: 12, textColor: BW.label, cellWidth: 40 },
       1: { cellWidth: 50 },
-      2: { font: 'helvetica', fontStyle: 'bold', fontSize: 8, textColor: BW.label, cellWidth: 40 },
+      2: { font: 'times', fontStyle: 'bold', fontSize: 12, textColor: BW.label, cellWidth: 40 },
       3: { cellWidth: 'auto' },
     },
   })
@@ -834,17 +845,17 @@ export async function generateBabyFullPDF(baby, exams, hospitalName) {
   ]
   const activeRisks = riskLabels.filter(r => r[1]).map(r => r[0])
   doc.setFont('times', 'normal')
-  doc.setFontSize(10)
+  doc.setFontSize(12)
   if (activeRisks.length) {
     setTxt(doc, BW.black)
     for (const risk of activeRisks) {
       doc.text(`•  ${risk}`, ML + 3, y)
-      y += 5.5
+      y += 6
     }
   } else {
     setTxt(doc, BW.label)
     doc.text('No risk factors recorded', ML + 3, y)
-    y += 5.5
+    y += 6
   }
   y += 5
 
@@ -853,10 +864,10 @@ export async function generateBabyFullPDF(baby, exams, hospitalName) {
     y = bwSectionHeading(doc, y, 'Clinical Notes')
     setTxt(doc, BW.black)
     doc.setFont('times', 'normal')
-    doc.setFontSize(10)
+    doc.setFontSize(12)
     const lines = doc.splitTextToSize(baby.notes, CW - 6)
     doc.text(lines, ML + 3, y)
-    y += lines.length * 5 + 8
+    y += lines.length * 6 + 8
   }
 
   // ── Examination History Summary ───────────────────────────────────────────
@@ -875,7 +886,7 @@ export async function generateBabyFullPDF(baby, exams, hospitalName) {
         : '-',
       e.next_exam_weeks != null ? String(e.next_exam_weeks) : '-',
     ]),
-    styles: { fontSize: 9, cellPadding: 2.5 },
+    styles: { fontSize: 12, cellPadding: 2.5 },
     columnStyles: {
       0: { cellWidth: 10, halign: 'center' },
       1: { cellWidth: 24 },
@@ -902,7 +913,7 @@ export async function generateBabyFullPDF(baby, exams, hospitalName) {
         VF_CSM_LABELS[e.vf_left_csm]                     || '-',
         VF_IMPRESSION_LABELS[e.vf_functional_impression]  || '-',
       ]),
-      styles: { fontSize: 7.5, cellPadding: 2 },
+      styles: { fontSize: 12, cellPadding: 2 },
       columnStyles: { 0: { cellWidth: 22 }, 7: { cellWidth: 38 } },
     })
     y = doc.lastAutoTable.finalY + 8
@@ -915,32 +926,32 @@ export async function generateBabyFullPDF(baby, exams, hospitalName) {
     const exam = sortedExams[ei]
     doc.addPage()
 
-    // Running header
+    // Running header — Times 12pt
     setTxt(doc, BW.black)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(9)
-    doc.text(`${baby.full_name}  |  Complete Clinical Record`, ML, 8)
-    doc.setFont('helvetica', 'normal')
-    doc.text(`Exam ${ei + 1} of ${sortedExams.length}`, PW - MR, 8, { align: 'right' })
+    doc.setFont('times', 'bold')
+    doc.setFontSize(12)
+    doc.text(`${baby.full_name}  |  Complete Clinical Record`, ML, 11)
+    doc.setFont('times', 'normal')
+    doc.text(`Exam ${ei + 1} of ${sortedExams.length}`, PW - MR, 11, { align: 'right' })
     setDraw(doc, BW.black)
     doc.setLineWidth(0.4)
-    doc.line(ML, 11, PW - MR, 11)
+    doc.line(ML, 14, PW - MR, 14)
 
-    let ey = 20
+    let ey = 23
 
     // Exam date heading
     setTxt(doc, BW.black)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(13)
-    doc.text(`Examination: ${fmtDate(exam.exam_date)}`, ML, ey + 7)
+    doc.setFont('times', 'bold')
+    doc.setFontSize(12)
+    doc.text(`Examination: ${fmtDate(exam.exam_date)}`, ML, ey + 6)
 
     const worstLabel = exam.worst_zone
       ? `${ZONE_LABELS[exam.worst_zone] || exam.worst_zone} / ${STAGE_LABELS[exam.worst_stage] || '-'}${exam.has_plus_disease === 'yes' ? ' + Plus Disease' : ''}`
       : 'No finding recorded'
     setTxt(doc, BW.label)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
-    doc.text(`Worst: ${worstLabel}`, ML, ey + 14)
+    doc.setFont('times', 'normal')
+    doc.setFontSize(12)
+    doc.text(`Worst: ${worstLabel}`, ML, ey + 13)
     ey += 22
 
     // Eye findings table
@@ -952,7 +963,7 @@ export async function generateBabyFullPDF(baby, exams, hospitalName) {
         ['Right Eye (OD)', ZONE_LABELS[exam.right_zone] || '-', STAGE_LABELS[exam.right_stage] || '-', PLUS_LABELS[exam.right_plus] || 'None'],
         ['Left Eye (OS)',  ZONE_LABELS[exam.left_zone]  || '-', STAGE_LABELS[exam.left_stage]  || '-', PLUS_LABELS[exam.left_plus]  || 'None'],
       ],
-      styles: { fontSize: 10, cellPadding: 3 },
+      styles: { fontSize: 12, cellPadding: 3 },
       columnStyles: { 0: { fontStyle: 'bold' } },
     })
     ey = doc.lastAutoTable.finalY + 6
@@ -968,9 +979,9 @@ export async function generateBabyFullPDF(baby, exams, hospitalName) {
         startY: ey,
         margin: { left: ML, right: MR },
         body: detailRows,
-        styles: { fontSize: 10, cellPadding: 2.5 },
+        styles: { fontSize: 12, cellPadding: 2.5 },
         columnStyles: {
-          0: { font: 'helvetica', fontStyle: 'bold', fontSize: 9, textColor: BW.label, cellWidth: 55 },
+          0: { font: 'times', fontStyle: 'bold', fontSize: 12, textColor: BW.label, cellWidth: 55 },
         },
       })
       ey = doc.lastAutoTable.finalY + 6
@@ -980,10 +991,10 @@ export async function generateBabyFullPDF(baby, exams, hospitalName) {
       ey = bwSectionHeading(doc, ey, 'Clinical Notes')
       setTxt(doc, BW.black)
       doc.setFont('times', 'normal')
-      doc.setFontSize(10)
+      doc.setFontSize(12)
       const lines = doc.splitTextToSize(exam.notes, CW - 6)
       doc.text(lines, ML + 3, ey)
-      ey += lines.length * 5 + 6
+      ey += lines.length * 6 + 6
     }
 
     if (hasVFData(exam)) {
@@ -991,7 +1002,7 @@ export async function generateBabyFullPDF(baby, exams, hospitalName) {
     }
 
     // Signature block
-    ey = Math.max(ey + 10, PH - 45)
+    ey = Math.max(ey + 10, PH - 48)
     const sigCols = [ML, ML + CW / 3, ML + (CW / 3) * 2]
     const sigW = CW / 3 - 4
     const sigLabels = ['Examined by', 'Signature', 'Date']
@@ -1000,9 +1011,9 @@ export async function generateBabyFullPDF(baby, exams, hospitalName) {
     for (let si = 0; si < 3; si++) {
       doc.line(sigCols[si], ey + 15, sigCols[si] + sigW, ey + 15)
       setTxt(doc, BW.label)
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(8)
-      doc.text(sigLabels[si], sigCols[si], ey + 21)
+      doc.setFont('times', 'normal')
+      doc.setFontSize(12)
+      doc.text(sigLabels[si], sigCols[si], ey + 22)
     }
 
     bwFooter(doc, ei + 2, totalPages)
