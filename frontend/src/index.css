@@ -1277,6 +1277,10 @@ tbody tr.row-on_track { border-left: 4px solid var(--green-600); }
 .notif-count-chip.notif-missed  { background: var(--amber-50); border-color: var(--amber-100); color: var(--amber-600); }
 .notif-count-chip.notif-due     { background: var(--teal-50);  border-color: var(--teal-100);  color: var(--teal-700); }
 .notif-count-chip.notif-sms     { background: var(--gray-50);  border-color: var(--gray-200);  color: var(--gray-600); }
+.notif-count-chip--active.notif-ltfu    { background: var(--red-100);   border-color: var(--red-400); }
+.notif-count-chip--active.notif-missed  { background: var(--amber-100); border-color: var(--amber-400); }
+.notif-count-chip--active.notif-due     { background: var(--teal-100);  border-color: var(--teal-400); }
+.notif-count-chip--active.notif-sms     { background: var(--gray-200);  border-color: var(--gray-400); }
 
 .notif-section-label {
   font-size: .73rem; font-weight: 700; text-transform: uppercase;

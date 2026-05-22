@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { formatDistanceToNow, format } from 'date-fns'
@@ -111,6 +112,7 @@ export default function NotificationsPage() {
   const { user } = useAuth()
   const qc = useQueryClient()
   const isOphthalm = user?.role === 'ophthalmologist'
+  const [activeFilter, setActiveFilter] = useState(null)
 
   const { data: notifications = [], isLoading, refetch } = useQuery({
     queryKey: ['notifications'],
@@ -165,10 +167,15 @@ export default function NotificationsPage() {
               { key: 'due_today',  label: 'Due today',     cls: 'notif-due' },
               { key: 'sms_failed', label: 'SMS failures',  cls: 'notif-sms' },
             ].map(({ key, label, cls }) => (
-              <div key={key} className={`notif-count-chip ${cls}`}>
+              <button
+                key={key}
+                className={`notif-count-chip ${cls}${activeFilter === key ? ' notif-count-chip--active' : ''}`}
+                onClick={() => setActiveFilter(prev => prev === key ? null : key)}
+                style={{ cursor: 'pointer', border: 'none', textAlign: 'left' }}
+              >
                 <span className="notif-count-chip-num">{counts[key]}</span>
                 <span>{label}</span>
-              </div>
+              </button>
             ))}
           </div>
 
@@ -186,18 +193,20 @@ export default function NotificationsPage() {
             </div>
           ) : (
             <div className="notif-list">
-              {['ltfu', 'missed', 'due_today', 'sms_failed'].map(type => (
-                grouped[type].length > 0 && (
-                  <div key={type}>
-                    <div className="notif-section-label">
-                      {TYPE_META[type]?.label} ({grouped[type].length})
+              {['ltfu', 'missed', 'due_today', 'sms_failed']
+                .filter(type => !activeFilter || activeFilter === type)
+                .map(type => (
+                  grouped[type].length > 0 && (
+                    <div key={type}>
+                      <div className="notif-section-label">
+                        {TYPE_META[type]?.label} ({grouped[type].length})
+                      </div>
+                      {grouped[type].map(item => (
+                        <NotifCard key={item.id} item={item} onDismiss={id => dismiss.mutate(id)} />
+                      ))}
                     </div>
-                    {grouped[type].map(item => (
-                      <NotifCard key={item.id} item={item} onDismiss={id => dismiss.mutate(id)} />
-                    ))}
-                  </div>
-                )
-              ))}
+                  )
+                ))}
             </div>
           )}
         </>
