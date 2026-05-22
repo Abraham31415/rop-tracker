@@ -432,482 +432,580 @@ function addPageHeader(doc, hospitalName, period) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TYPE 2A — Single Visit Report
+// B&W HELPERS  (Type 2A and 2B only — population PDF keeps its coloured helpers)
+// ─────────────────────────────────────────────────────────────────────────────
+const BW = {
+  black:  [0, 0, 0],
+  white:  [255, 255, 255],
+  gray:   [245, 245, 245],   // F5F5F5 alternating row fill
+  border: [180, 180, 180],   // thin rule / cell border
+  label:  [100, 100, 100],   // secondary / label text
+}
+
+const STATUS_LABELS_BW = {
+  active:     '[ACTIVE]',
+  ltfu:       '[LOST TO FOLLOW-UP]',
+  discharged: '[DISCHARGED]',
+  treated:    '[TREATED]',
+}
+
+async function qrDataUrlBW(url) {
+  try {
+    return await QRCode.toDataURL(url, { width: 200, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
+  } catch { return null }
+}
+
+function bwFooter(doc, pageNum, totalPages) {
+  const fy = PH - 10
+  setDraw(doc, BW.border)
+  doc.setLineWidth(0.3)
+  doc.line(ML, fy, PW - MR, fy)
+  setTxt(doc, BW.label)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  doc.text('ROP Tracker Uganda', ML, fy + 4)
+  doc.text('CONFIDENTIAL: For clinical use only', PW / 2, fy + 4, { align: 'center' })
+  doc.text(`Page ${pageNum} of ${totalPages}`, PW - MR, fy + 4, { align: 'right' })
+}
+
+// Bold helvetica uppercase heading + thin black underline; returns y after heading
+function bwSectionHeading(doc, y, title) {
+  setTxt(doc, BW.black)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9)
+  doc.text(title.toUpperCase(), ML, y + 5)
+  setDraw(doc, BW.black)
+  doc.setLineWidth(0.4)
+  doc.line(ML, y + 7, ML + CW, y + 7)
+  return y + 13
+}
+
+// autoTable wrapper: times body, helvetica head, black borders, F5F5F5 alt rows
+function bwTable(doc, opts) {
+  autoTable(doc, {
+    ...opts,
+    styles: {
+      font: 'times',
+      fontSize: 10,
+      textColor: BW.black,
+      cellPadding: 2.5,
+      lineColor: BW.border,
+      lineWidth: 0.3,
+      ...(opts.styles || {}),
+    },
+    headStyles: {
+      fillColor: BW.white,
+      textColor: BW.black,
+      fontStyle: 'bold',
+      font: 'helvetica',
+      lineColor: BW.black,
+      lineWidth: 0.4,
+      ...(opts.headStyles || {}),
+    },
+    alternateRowStyles: {
+      fillColor: BW.gray,
+      ...(opts.alternateRowStyles || {}),
+    },
+    bodyStyles: {
+      fillColor: BW.white,
+      ...(opts.bodyStyles || {}),
+    },
+  })
+}
+
+function addVFSectionBW(doc, exam, yStart) {
+  let y = yStart
+  y = bwSectionHeading(doc, y, 'Visual Function Assessment')
+
+  const rows = []
+  if (exam.vf_right_fixation || exam.vf_left_fixation)
+    rows.push(['Fixation', VF_FIXATION_LABELS[exam.vf_right_fixation] || '-', VF_FIXATION_LABELS[exam.vf_left_fixation] || '-'])
+  if (exam.vf_right_following || exam.vf_left_following)
+    rows.push(['Following', VF_FOLLOWING_LABELS[exam.vf_right_following] || '-', VF_FOLLOWING_LABELS[exam.vf_left_following] || '-'])
+  if (exam.vf_right_csm || exam.vf_left_csm)
+    rows.push(['CSM', VF_CSM_LABELS[exam.vf_right_csm] || '-', VF_CSM_LABELS[exam.vf_left_csm] || '-'])
+  if (exam.vf_right_teller_acuity != null || exam.vf_left_teller_acuity != null)
+    rows.push(['Teller Acuity (c/d)',
+      exam.vf_right_teller_acuity != null ? String(exam.vf_right_teller_acuity) : '-',
+      exam.vf_left_teller_acuity  != null ? String(exam.vf_left_teller_acuity)  : '-'])
+  if (exam.vf_right_vep != null || exam.vf_left_vep != null)
+    rows.push(['VEP (LogMAR)',
+      exam.vf_right_vep != null ? String(exam.vf_right_vep) : '-',
+      exam.vf_left_vep  != null ? String(exam.vf_left_vep)  : '-'])
+
+  if (rows.length > 0) {
+    bwTable(doc, {
+      startY: y,
+      margin: { left: ML, right: MR },
+      head: [['Finding', 'Right Eye (OD)', 'Left Eye (OS)']],
+      body: rows,
+      styles: { fontSize: 9, cellPadding: 2.5 },
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 45 } },
+    })
+    y = doc.lastAutoTable.finalY + 4
+  }
+
+  const binocular = []
+  if (exam.vf_nystagmus)             binocular.push(['Nystagmus',         VF_NYSTAGMUS_LABELS[exam.vf_nystagmus]])
+  if (exam.vf_strabismus)            binocular.push(['Strabismus',        VF_STRABISMUS_LABELS[exam.vf_strabismus]])
+  if (exam.vf_functional_impression) binocular.push(['Overall Impression', VF_IMPRESSION_LABELS[exam.vf_functional_impression]])
+
+  if (binocular.length > 0) {
+    bwTable(doc, {
+      startY: y,
+      margin: { left: ML, right: MR },
+      body: binocular,
+      styles: { fontSize: 9, cellPadding: 2.5 },
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 55 } },
+    })
+    y = doc.lastAutoTable.finalY + 4
+  }
+
+  if (exam.vf_notes) {
+    setTxt(doc, BW.black)
+    doc.setFont('times', 'italic')
+    doc.setFontSize(9)
+    const lines = doc.splitTextToSize(exam.vf_notes, CW - 6)
+    doc.text(lines, ML + 3, y)
+    y += lines.length * 4.5 + 4
+  }
+
+  return y
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TYPE 2A — Single Visit Report  (black & white)
 // ─────────────────────────────────────────────────────────────────────────────
 export async function generateSingleVisitPDF(baby, exam, hospitalName) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const babyUrl = `${window.location.origin}/babies/${baby.id}`
-  const qr = await qrDataUrl(babyUrl)
+  const qr = await qrDataUrlBW(babyUrl)
 
-  // Header band
-  setFill(doc, C.teal)
-  doc.rect(0, 0, PW, 18, 'F')
-  setTxt(doc, C.white)
+  // ── Header: text left, QR right ───────────────────────────────────────────
+  const QR_SIZE = 24
+  const qrX = PW - MR - QR_SIZE
+
+  setTxt(doc, BW.black)
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(14)
-  doc.text('ROP Tracker Uganda', ML, 8)
+  doc.setFontSize(16)
+  doc.text('ROP Tracker Uganda', ML, 12)
+
+  setTxt(doc, BW.label)
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(8.5)
-  doc.text(hospitalName || 'Uganda ROP Network', ML, 13.5)
-  doc.text('Retinal Examination Report', PW - MR, 8, { align: 'right' })
-  doc.text(`Date: ${fmtNow()}`, PW - MR, 13.5, { align: 'right' })
+  doc.setFontSize(9)
+  doc.text(hospitalName || 'Uganda ROP Network', ML, 18)
+  doc.text('Retinal Examination Report', ML, 24)
+  doc.text(`Generated: ${fmtNow()}`, ML, 30)
 
-  let y = 24
-
-  // QR code top-right
   if (qr) {
-    doc.addImage(qr, 'PNG', PW - MR - 24, y, 24, 24)
-    setTxt(doc, C.gray500)
+    doc.addImage(qr, 'PNG', qrX, 4, QR_SIZE, QR_SIZE)
+    setTxt(doc, BW.label)
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(6.5)
-    doc.text('Scan for digital record', PW - MR - 12, y + 27, { align: 'center' })
+    doc.setFontSize(7)
+    doc.text('Scan for digital record', qrX + QR_SIZE / 2, 31, { align: 'center' })
     if (baby.rop_id) {
-      setTxt(doc, C.teal)
+      setTxt(doc, BW.black)
       doc.setFont('helvetica', 'bold')
-      doc.setFontSize(7.5)
-      doc.text(baby.rop_id, PW - MR - 12, y + 33, { align: 'center' })
-    }
-  }
-
-  // ── Baby details ──
-  y = sectionHeading(doc, y, 'Patient Information')
-  const bdRows = [
-    ...(baby.rop_id ? [['ROP ID', baby.rop_id, 'Hospital', hospitalName || '-']] : []),
-    ['Full Name', baby.full_name, 'Date of Birth', fmtDate(baby.date_of_birth)],
-    ['Sex', baby.sex === 'male' ? 'Male' : 'Female', 'Gestational Age', `${baby.gestational_age_weeks} weeks`],
-    ['Birth Weight', `${baby.birth_weight_grams}g`, 'Caregiver', baby.caregiver_name],
-    ['MTN Phone', baby.mtn_phone || '-', 'Airtel Phone', baby.airtel_phone || '-'],
-  ]
-  for (const [l1, v1, l2, v2] of bdRows) {
-    setTxt(doc, C.gray500)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8)
-    doc.text(l1 + ':', ML, y)
-    setTxt(doc, C.gray900)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(9)
-    doc.text(v1 || '-', ML + 30, y)
-    if (l2) {
-      setTxt(doc, C.gray500)
-      doc.setFont('helvetica', 'normal')
       doc.setFontSize(8)
-      doc.text(l2 + ':', ML + CW / 2, y)
-      setTxt(doc, C.gray900)
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(9)
-      doc.text(v2 || '-', ML + CW / 2 + 35, y)
+      doc.text(baby.rop_id, qrX + QR_SIZE / 2, 37, { align: 'center' })
     }
-    y += 7.5
   }
-  y += 2
 
-  // ── Risk factors ──
-  y = sectionHeading(doc, y, 'Risk Factors')
+  setDraw(doc, BW.black)
+  doc.setLineWidth(0.5)
+  doc.line(ML, 39, PW - MR, 39)
+
+  let y = 46
+
+  // ── Patient Information ───────────────────────────────────────────────────
+  y = bwSectionHeading(doc, y, 'Patient Information')
+
+  const bdRows = [
+    ...(baby.rop_id ? [['ROP Tracker ID', baby.rop_id, 'Hospital', hospitalName || '-']] : []),
+    ['Full Name',    baby.full_name,                          'Date of Birth',   fmtDate(baby.date_of_birth)],
+    ['Sex',          baby.sex === 'male' ? 'Male' : 'Female', 'Gestational Age', `${baby.gestational_age_weeks} weeks`],
+    ['Birth Weight', `${baby.birth_weight_grams}g`,           'Caregiver',       baby.caregiver_name],
+    ['MTN Phone',    baby.mtn_phone || '-',                   'Airtel Phone',    baby.airtel_phone || '-'],
+  ]
+  bwTable(doc, {
+    startY: y,
+    margin: { left: ML, right: MR },
+    body: bdRows,
+    styles: { fontSize: 10, cellPadding: 2.5 },
+    columnStyles: {
+      0: { font: 'helvetica', fontStyle: 'bold', fontSize: 8, textColor: BW.label, cellWidth: 38 },
+      1: { cellWidth: 52 },
+      2: { font: 'helvetica', fontStyle: 'bold', fontSize: 8, textColor: BW.label, cellWidth: 38 },
+      3: { cellWidth: 'auto' },
+    },
+  })
+  y = doc.lastAutoTable.finalY + 7
+
+  // ── Risk Factors ──────────────────────────────────────────────────────────
+  y = bwSectionHeading(doc, y, 'Risk Factors')
   const risks = [
-    ['Oxygen Therapy', baby.oxygen_therapy],
+    ['Oxygen Therapy',    baby.oxygen_therapy],
     ['Blood Transfusion', baby.blood_transfusion],
-    ['Sepsis', baby.sepsis],
-    ['Inotropes', baby.inotropes],
-    ['Anaemia', baby.anaemia],
+    ['Sepsis',            baby.sepsis],
+    ['Inotropes',         baby.inotropes],
+    ['Anaemia',           baby.anaemia],
   ]
   const activeRisks = risks.filter(r => r[1]).map(r => r[0])
-  setTxt(doc, activeRisks.length ? C.red : C.gray500)
-  doc.setFont('helvetica', activeRisks.length ? 'bold' : 'normal')
-  doc.setFontSize(9)
-  doc.text(activeRisks.length ? activeRisks.join('  ·  ') : 'No risk factors recorded', ML + 3, y)
-  y += 10
+  doc.setFont('times', 'normal')
+  doc.setFontSize(10)
+  if (activeRisks.length) {
+    setTxt(doc, BW.black)
+    for (const risk of activeRisks) {
+      doc.text(`•  ${risk}`, ML + 3, y)
+      y += 5.5
+    }
+  } else {
+    setTxt(doc, BW.label)
+    doc.text('No risk factors recorded', ML + 3, y)
+    y += 5.5
+  }
+  y += 5
 
-  // ── Exam details ──
-  y = sectionHeading(doc, y, `Examination: ${fmtDate(exam.exam_date)}`)
+  // ── Eye Findings ──────────────────────────────────────────────────────────
+  y = bwSectionHeading(doc, y, `Examination: ${fmtDate(exam.exam_date)}`)
+  bwTable(doc, {
+    startY: y,
+    margin: { left: ML, right: MR },
+    head: [['Eye', 'Zone', 'Stage', 'Plus Disease']],
+    body: [
+      ['Right Eye (OD)', ZONE_LABELS[exam.right_zone] || '-', STAGE_LABELS[exam.right_stage] || '-', PLUS_LABELS[exam.right_plus] || 'None'],
+      ['Left Eye (OS)',  ZONE_LABELS[exam.left_zone]  || '-', STAGE_LABELS[exam.left_stage]  || '-', PLUS_LABELS[exam.left_plus]  || 'None'],
+    ],
+    styles: { fontSize: 10, cellPadding: 3 },
+    columnStyles: { 0: { fontStyle: 'bold' } },
+  })
+  y = doc.lastAutoTable.finalY + 5
 
-  // Two eye boxes side by side
-  const eyeW = (CW - 6) / 2
-  const eyeH = 30
-
-  // Right eye box
-  setFill(doc, [239, 246, 255])
-  doc.rect(ML, y, eyeW, eyeH, 'F')
-  setFill(doc, [37, 99, 235])
-  doc.rect(ML, y, eyeW, 2, 'F')
-  setTxt(doc, [37, 99, 235])
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8.5)
-  doc.text('RIGHT EYE (OD)', ML + eyeW / 2, y + 7, { align: 'center' })
-  setTxt(doc, C.gray900)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.text(eyeStr(exam.right_zone, exam.right_stage, exam.right_plus), ML + eyeW / 2, y + 16, { align: 'center' })
-  setTxt(doc, C.gray500)
-  doc.setFontSize(7.5)
-  doc.text(`Plus: ${PLUS_LABELS[exam.right_plus] || 'None'}`, ML + eyeW / 2, y + 24, { align: 'center' })
-
-  // Left eye box
-  const lx = ML + eyeW + 6
-  setFill(doc, [240, 253, 244])
-  doc.rect(lx, y, eyeW, eyeH, 'F')
-  setFill(doc, [22, 163, 74])
-  doc.rect(lx, y, eyeW, 2, 'F')
-  setTxt(doc, [22, 163, 74])
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8.5)
-  doc.text('LEFT EYE (OS)', lx + eyeW / 2, y + 7, { align: 'center' })
-  setTxt(doc, C.gray900)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.text(eyeStr(exam.left_zone, exam.left_stage, exam.left_plus), lx + eyeW / 2, y + 16, { align: 'center' })
-  setTxt(doc, C.gray500)
-  doc.setFontSize(7.5)
-  doc.text(`Plus: ${PLUS_LABELS[exam.left_plus] || 'None'}`, lx + eyeW / 2, y + 24, { align: 'center' })
-
-  y += eyeH + 6
-
-  // Worst finding summary
-  setFill(doc, exam.worst_zone === 'zone_i' ? [254, 226, 226] : exam.worst_zone === 'zone_ii' ? [255, 237, 213] : C.tealLight)
-  doc.rect(ML, y, CW, 8, 'F')
-  setTxt(doc, exam.worst_zone === 'zone_i' ? C.red : exam.worst_zone === 'zone_ii' ? C.amber : C.tealText)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(9)
   const worstStr = exam.worst_zone
     ? `Worst Finding: ${ZONE_LABELS[exam.worst_zone] || exam.worst_zone} / ${STAGE_LABELS[exam.worst_stage] || '-'}${exam.has_plus_disease === 'yes' ? ' + Plus Disease' : ''}`
-    : 'No ROP Finding Recorded'
-  doc.text(worstStr, ML + 3, y + 5.5)
-  y += 12
+    : 'Worst Finding: No ROP recorded'
+  setTxt(doc, BW.black)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(10)
+  doc.text(worstStr, ML + 3, y + 5)
+  y += 13
 
-  // Treatment + next appointment
+  // ── Treatment ─────────────────────────────────────────────────────────────
   if (exam.treatment_recommended) {
-    y = sectionHeading(doc, y, 'Treatment Recommended')
-    setTxt(doc, C.gray900)
-    doc.setFont('helvetica', 'bold')
+    y = bwSectionHeading(doc, y, 'Treatment Recommended')
+    setTxt(doc, BW.black)
+    doc.setFont('times', 'bold')
     doc.setFontSize(10)
     doc.text(TREATMENT_LABELS[exam.treatment_recommended] || exam.treatment_recommended, ML + 3, y)
-    y += 10
+    y += 11
   }
 
+  // ── Next Appointment ──────────────────────────────────────────────────────
   if (exam.next_exam_weeks) {
-    y = sectionHeading(doc, y, 'Next Appointment')
-    setTxt(doc, C.gray900)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
+    y = bwSectionHeading(doc, y, 'Next Appointment')
+    setTxt(doc, BW.black)
+    doc.setFont('times', 'normal')
+    doc.setFontSize(10)
     doc.text(`Return in ${exam.next_exam_weeks} week${exam.next_exam_weeks > 1 ? 's' : ''} for next examination`, ML + 3, y)
-    y += 10
+    y += 11
   }
 
+  // ── Clinical Notes ────────────────────────────────────────────────────────
   if (exam.notes) {
-    y = sectionHeading(doc, y, 'Clinical Notes')
-    setTxt(doc, C.gray700)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
+    y = bwSectionHeading(doc, y, 'Clinical Notes')
+    setTxt(doc, BW.black)
+    doc.setFont('times', 'normal')
+    doc.setFontSize(10)
     const lines = doc.splitTextToSize(exam.notes, CW - 6)
     doc.text(lines, ML + 3, y)
-    y += lines.length * 5 + 5
+    y += lines.length * 5 + 6
   }
 
+  // ── Visual Function ───────────────────────────────────────────────────────
   if (hasVFData(exam)) {
-    y = addVFSection(doc, exam, y)
+    y = addVFSectionBW(doc, exam, y)
   }
 
-  // ── Signature block ──
-  y = Math.max(y + 8, PH - 60)
-  setDraw(doc, C.gray200)
-  doc.setLineWidth(0.3)
-  doc.line(ML, y, ML + 3, y)
-
+  // ── Signature block ───────────────────────────────────────────────────────
+  y = Math.max(y + 8, PH - 52)
   const sigCols = [ML, ML + CW / 3, ML + (CW / 3) * 2]
+  const sigW = CW / 3 - 4
   const sigLabels = ['Examined by (Print Name)', 'Signature', 'Date']
+  setDraw(doc, BW.border)
+  doc.setLineWidth(0.3)
   for (let i = 0; i < 3; i++) {
-    const sx = sigCols[i]
-    const sw = CW / 3 - 4
-    doc.line(sx, y + 15, sx + sw, y + 15)
-    setTxt(doc, C.gray500)
+    doc.line(sigCols[i], y + 15, sigCols[i] + sigW, y + 15)
+    setTxt(doc, BW.label)
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(7.5)
-    doc.text(sigLabels[i], sx, y + 20)
+    doc.setFontSize(8)
+    doc.text(sigLabels[i], sigCols[i], y + 21)
   }
 
-  addFooter(doc, 1, 1)
+  bwFooter(doc, 1, 1)
   doc.save(`ROP-Visit-${baby.full_name.replace(/\s+/g, '-')}-${exam.exam_date}.pdf`)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TYPE 2B — Full Baby Summary (all visits, most recent first)
+// TYPE 2B — Full Baby Summary  (black & white, all visits most recent first)
 // ─────────────────────────────────────────────────────────────────────────────
 export async function generateBabyFullPDF(baby, exams, hospitalName) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const babyUrl = `${window.location.origin}/babies/${baby.id}`
-  const qr = await qrDataUrl(babyUrl)
+  const qr = await qrDataUrlBW(babyUrl)
 
   const sortedExams = [...exams].sort((a, b) => new Date(b.exam_date) - new Date(a.exam_date))
+  const totalPages = sortedExams.length + 1
 
   // ── COVER ─────────────────────────────────────────────────────────────────
-  setFill(doc, C.teal)
-  doc.rect(0, 0, PW, 50, 'F')
+  const QR_SIZE = 26
+  const qrX = PW - MR - QR_SIZE
 
-  setTxt(doc, C.white)
+  setTxt(doc, BW.black)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(18)
-  doc.text('ROP Tracker Uganda', ML, 16)
+  doc.text('ROP Tracker Uganda', ML, 14)
+
+  setTxt(doc, BW.label)
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9.5)
-  doc.text('Complete Clinical Record: All Examinations', ML, 23)
-  doc.text(hospitalName || '', ML, 30)
+  doc.setFontSize(9)
+  doc.text('Complete Clinical Record: All Examinations', ML, 20)
+  doc.text(hospitalName || '', ML, 26)
 
   if (qr) {
-    doc.addImage(qr, 'PNG', PW - MR - 26, 12, 26, 26)
-  }
-
-  setFill(doc, [255, 255, 255])
-  doc.rect(0, 50, PW, 1.5, 'F')
-
-  let y = 60
-
-  // Baby summary box
-  setFill(doc, C.gray100)
-  doc.roundedRect(ML, y, CW, 48, 3, 3, 'F')
-  setDraw(doc, C.gray200)
-  doc.setLineWidth(0.3)
-  doc.roundedRect(ML, y, CW, 48, 3, 3, 'S')
-
-  // Left accent
-  setFill(doc, C.teal)
-  doc.roundedRect(ML, y, 3, 48, 1.5, 1.5, 'F')
-
-  y += 8
-  setTxt(doc, C.gray900)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(15)
-  doc.text(baby.full_name, ML + 8, y)
-
-  const statusColor = baby.status === 'ltfu' ? C.red : baby.status === 'active' ? C.teal : C.gray500
-  setTxt(doc, statusColor)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(9)
-  doc.text((baby.status || 'active').toUpperCase(), PW - MR, y, { align: 'right' })
-
-  if (baby.rop_id) {
-    y += 6
-    setTxt(doc, C.teal)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(10)
-    doc.text(baby.rop_id, ML + 8, y)
-    y += 4
-  } else {
-    y += 9
-  }
-
-  const infoItems = [
-    ['Date of Birth', fmtDate(baby.date_of_birth)],
-    ['Sex', baby.sex === 'male' ? 'Male' : 'Female'],
-    ['Gestational Age', `${baby.gestational_age_weeks}w`],
-    ['Birth Weight', `${baby.birth_weight_grams}g`],
-    ['Caregiver', baby.caregiver_name],
-    ['Phone', baby.mtn_phone || baby.airtel_phone || '-'],
-    ['Total Exams', sortedExams.length],
-    ['Enrolled', fmtDate(baby.enrolled_at?.split('T')[0] || '')],
-  ]
-
-  const colW2 = CW / 2 - 5
-  for (let i = 0; i < infoItems.length; i++) {
-    const col = i % 2
-    const row = Math.floor(i / 2)
-    const ix = ML + 8 + col * (colW2 + 5)
-    const iy = y + row * 8
-
-    setTxt(doc, C.gray500)
+    doc.addImage(qr, 'PNG', qrX, 4, QR_SIZE, QR_SIZE)
+    setTxt(doc, BW.label)
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(7.5)
-    doc.text(infoItems[i][0] + ':', ix, iy)
-    setTxt(doc, C.gray900)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(8.5)
-    doc.text(String(infoItems[i][1] || '-'), ix + 32, iy)
+    doc.setFontSize(7)
+    doc.text('Scan for digital record', qrX + QR_SIZE / 2, 33, { align: 'center' })
   }
-  y += Math.ceil(infoItems.length / 2) * 8 + 8
 
-  // Risk factors
-  y = sectionHeading(doc, y, 'Risk Factors')
+  setDraw(doc, BW.black)
+  doc.setLineWidth(0.7)
+  doc.line(ML, 32, PW - MR, 32)
+
+  let y = 40
+
+  // Baby name and status
+  setTxt(doc, BW.black)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(16)
+  doc.text(baby.full_name, ML, y)
+
+  const statusText = STATUS_LABELS_BW[baby.status] || '[ACTIVE]'
+  doc.setFontSize(10)
+  doc.text(statusText, PW - MR, y, { align: 'right' })
+
+  y += 7
+  if (baby.rop_id) {
+    doc.setFontSize(11)
+    doc.text(baby.rop_id, ML, y)
+    y += 8
+  }
+
+  // Patient details table
+  const patientRows = [
+    ['Date of Birth',   fmtDate(baby.date_of_birth),         'Sex',         baby.sex === 'male' ? 'Male' : 'Female'],
+    ['Gestational Age', `${baby.gestational_age_weeks}w`,    'Birth Weight', `${baby.birth_weight_grams}g`],
+    ['Caregiver',       baby.caregiver_name,                  'Phone',        baby.mtn_phone || baby.airtel_phone || '-'],
+    ['Total Exams',     String(sortedExams.length),           'Enrolled',     fmtDate(baby.enrolled_at?.split('T')[0] || '')],
+  ]
+  bwTable(doc, {
+    startY: y,
+    margin: { left: ML, right: MR },
+    body: patientRows,
+    styles: { fontSize: 10, cellPadding: 2.5 },
+    columnStyles: {
+      0: { font: 'helvetica', fontStyle: 'bold', fontSize: 8, textColor: BW.label, cellWidth: 40 },
+      1: { cellWidth: 50 },
+      2: { font: 'helvetica', fontStyle: 'bold', fontSize: 8, textColor: BW.label, cellWidth: 40 },
+      3: { cellWidth: 'auto' },
+    },
+  })
+  y = doc.lastAutoTable.finalY + 8
+
+  // ── Risk Factors ──────────────────────────────────────────────────────────
+  y = bwSectionHeading(doc, y, 'Risk Factors')
   const riskLabels = [
-    ['Oxygen Therapy', baby.oxygen_therapy],
+    ['Oxygen Therapy',    baby.oxygen_therapy],
     ['Blood Transfusion', baby.blood_transfusion],
-    ['Sepsis', baby.sepsis],
-    ['Inotropes', baby.inotropes],
-    ['Anaemia', baby.anaemia],
+    ['Sepsis',            baby.sepsis],
+    ['Inotropes',         baby.inotropes],
+    ['Anaemia',           baby.anaemia],
   ]
   const activeRisks = riskLabels.filter(r => r[1]).map(r => r[0])
-  setTxt(doc, activeRisks.length ? C.red : C.gray500)
-  doc.setFont('helvetica', activeRisks.length ? 'bold' : 'normal')
-  doc.setFontSize(9)
-  doc.text(activeRisks.length ? activeRisks.join('  ·  ') : 'No risk factors recorded', ML + 3, y)
-  y += 12
+  doc.setFont('times', 'normal')
+  doc.setFontSize(10)
+  if (activeRisks.length) {
+    setTxt(doc, BW.black)
+    for (const risk of activeRisks) {
+      doc.text(`•  ${risk}`, ML + 3, y)
+      y += 5.5
+    }
+  } else {
+    setTxt(doc, BW.label)
+    doc.text('No risk factors recorded', ML + 3, y)
+    y += 5.5
+  }
+  y += 5
 
+  // ── Clinical Notes ────────────────────────────────────────────────────────
   if (baby.notes) {
-    y = sectionHeading(doc, y, 'Clinical Notes')
-    setTxt(doc, C.gray700)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
+    y = bwSectionHeading(doc, y, 'Clinical Notes')
+    setTxt(doc, BW.black)
+    doc.setFont('times', 'normal')
+    doc.setFontSize(10)
     const lines = doc.splitTextToSize(baby.notes, CW - 6)
     doc.text(lines, ML + 3, y)
     y += lines.length * 5 + 8
   }
 
-  // VF trajectory summary on cover
+  // ── Examination History Summary ───────────────────────────────────────────
+  y = bwSectionHeading(doc, y, 'Examination History Summary')
+  bwTable(doc, {
+    startY: y,
+    margin: { left: ML, right: MR },
+    head: [['#', 'Date', 'Right Eye (OD)', 'Left Eye (OS)', 'Worst Finding', 'Next (wks)']],
+    body: [...sortedExams].reverse().map((e, i) => [
+      i + 1,
+      fmtDate(e.exam_date),
+      eyeStr(e.right_zone, e.right_stage, e.right_plus),
+      eyeStr(e.left_zone,  e.left_stage,  e.left_plus),
+      e.worst_zone
+        ? `${ZONE_LABELS[e.worst_zone] || e.worst_zone} / ${STAGE_LABELS[e.worst_stage] || '-'}`
+        : '-',
+      e.next_exam_weeks != null ? String(e.next_exam_weeks) : '-',
+    ]),
+    styles: { fontSize: 9, cellPadding: 2.5 },
+    columnStyles: {
+      0: { cellWidth: 10, halign: 'center' },
+      1: { cellWidth: 24 },
+      5: { cellWidth: 18, halign: 'center' },
+    },
+  })
+  y = doc.lastAutoTable.finalY + 8
+
+  // ── Visual Function Trajectory ────────────────────────────────────────────
   const vfExams = sortedExams.filter(hasVFData)
   if (vfExams.length > 0) {
-    y = sectionHeading(doc, y, 'Visual Function Trajectory')
-    const vfRows = [...vfExams].reverse().map(e => [
-      fmtDate(e.exam_date),
-      VF_FIXATION_LABELS[e.vf_right_fixation] || '-',
-      VF_FOLLOWING_LABELS[e.vf_right_following] || '-',
-      VF_CSM_LABELS[e.vf_right_csm] || '-',
-      VF_FIXATION_LABELS[e.vf_left_fixation] || '-',
-      VF_FOLLOWING_LABELS[e.vf_left_following] || '-',
-      VF_CSM_LABELS[e.vf_left_csm] || '-',
-      VF_IMPRESSION_LABELS[e.vf_functional_impression] || '-',
-    ])
-    autoTable(doc, {
+    y = bwSectionHeading(doc, y, 'Visual Function Trajectory')
+    bwTable(doc, {
       startY: y,
       margin: { left: ML, right: MR },
       head: [['Date', 'OD Fix', 'OD Follow', 'OD CSM', 'OS Fix', 'OS Follow', 'OS CSM', 'Impression']],
-      body: vfRows,
+      body: [...vfExams].reverse().map(e => [
+        fmtDate(e.exam_date),
+        VF_FIXATION_LABELS[e.vf_right_fixation]          || '-',
+        VF_FOLLOWING_LABELS[e.vf_right_following]         || '-',
+        VF_CSM_LABELS[e.vf_right_csm]                    || '-',
+        VF_FIXATION_LABELS[e.vf_left_fixation]            || '-',
+        VF_FOLLOWING_LABELS[e.vf_left_following]          || '-',
+        VF_CSM_LABELS[e.vf_left_csm]                     || '-',
+        VF_IMPRESSION_LABELS[e.vf_functional_impression]  || '-',
+      ]),
       styles: { fontSize: 7.5, cellPadding: 2 },
-      headStyles: { fillColor: [204, 251, 241], textColor: [17, 94, 89], fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: C.gray100 },
       columnStyles: { 0: { cellWidth: 22 }, 7: { cellWidth: 38 } },
     })
     y = doc.lastAutoTable.finalY + 8
   }
 
-  // QR note
-  if (qr) {
-    setTxt(doc, C.gray500)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(7)
-    doc.text('Scan QR code to open digital record in ROP Tracker', PW - MR, 42, { align: 'right' })
-  }
-
-  const totalPages = sortedExams.length + 1
-  addFooter(doc, 1, totalPages)
+  bwFooter(doc, 1, totalPages)
 
   // ── One page per exam ─────────────────────────────────────────────────────
   for (let ei = 0; ei < sortedExams.length; ei++) {
     const exam = sortedExams[ei]
     doc.addPage()
 
-    // Page header
-    setFill(doc, C.teal)
-    doc.rect(0, 0, PW, 13, 'F')
-    setTxt(doc, C.white)
+    // Running header
+    setTxt(doc, BW.black)
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(9.5)
-    doc.text(`${baby.full_name}  ·  Complete Clinical Record`, ML, 8.5)
+    doc.setFontSize(9)
+    doc.text(`${baby.full_name}  |  Complete Clinical Record`, ML, 8)
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8.5)
-    doc.text(`Exam ${ei + 1} of ${sortedExams.length}`, PW - MR, 8.5, { align: 'right' })
+    doc.text(`Exam ${ei + 1} of ${sortedExams.length}`, PW - MR, 8, { align: 'right' })
+    setDraw(doc, BW.black)
+    doc.setLineWidth(0.4)
+    doc.line(ML, 11, PW - MR, 11)
 
     let ey = 20
 
     // Exam date heading
-    const sevColor = exam.worst_zone === 'zone_i' ? C.red : exam.worst_zone === 'zone_ii' ? C.amber : C.teal
-    setFill(doc, sevColor)
-    doc.rect(ML, ey, 2, 12, 'F')
-    setTxt(doc, C.gray900)
+    setTxt(doc, BW.black)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(13)
-    doc.text(`Examination: ${fmtDate(exam.exam_date)}`, ML + 6, ey + 9)
+    doc.text(`Examination: ${fmtDate(exam.exam_date)}`, ML, ey + 7)
 
     const worstLabel = exam.worst_zone
       ? `${ZONE_LABELS[exam.worst_zone] || exam.worst_zone} / ${STAGE_LABELS[exam.worst_stage] || '-'}${exam.has_plus_disease === 'yes' ? ' + Plus Disease' : ''}`
       : 'No finding recorded'
-    setTxt(doc, sevColor)
+    setTxt(doc, BW.label)
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8.5)
-    doc.text(`Worst: ${worstLabel}`, ML + 6, ey + 15)
+    doc.setFontSize(9)
+    doc.text(`Worst: ${worstLabel}`, ML, ey + 14)
     ey += 22
 
-    // Eye boxes
-    const eyeW = (CW - 6) / 2
-    const eyeH = 30
+    // Eye findings table
+    bwTable(doc, {
+      startY: ey,
+      margin: { left: ML, right: MR },
+      head: [['Eye', 'Zone', 'Stage', 'Plus Disease']],
+      body: [
+        ['Right Eye (OD)', ZONE_LABELS[exam.right_zone] || '-', STAGE_LABELS[exam.right_stage] || '-', PLUS_LABELS[exam.right_plus] || 'None'],
+        ['Left Eye (OS)',  ZONE_LABELS[exam.left_zone]  || '-', STAGE_LABELS[exam.left_stage]  || '-', PLUS_LABELS[exam.left_plus]  || 'None'],
+      ],
+      styles: { fontSize: 10, cellPadding: 3 },
+      columnStyles: { 0: { fontStyle: 'bold' } },
+    })
+    ey = doc.lastAutoTable.finalY + 6
 
-    setFill(doc, [239, 246, 255])
-    doc.rect(ML, ey, eyeW, eyeH, 'F')
-    setFill(doc, [37, 99, 235])
-    doc.rect(ML, ey, eyeW, 2, 'F')
-    setTxt(doc, [37, 99, 235])
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(8.5)
-    doc.text('RIGHT EYE (OD)', ML + eyeW / 2, ey + 7, { align: 'center' })
-    setTxt(doc, C.gray900)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
-    doc.text(eyeStr(exam.right_zone, exam.right_stage, exam.right_plus), ML + eyeW / 2, ey + 15, { align: 'center' })
-    setTxt(doc, C.gray500)
-    doc.setFontSize(7.5)
-    doc.text(`Plus Disease: ${PLUS_LABELS[exam.right_plus] || 'None'}`, ML + eyeW / 2, ey + 23, { align: 'center' })
-
-    const lx = ML + eyeW + 6
-    setFill(doc, [240, 253, 244])
-    doc.rect(lx, ey, eyeW, eyeH, 'F')
-    setFill(doc, [22, 163, 74])
-    doc.rect(lx, ey, eyeW, 2, 'F')
-    setTxt(doc, [22, 163, 74])
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(8.5)
-    doc.text('LEFT EYE (OS)', lx + eyeW / 2, ey + 7, { align: 'center' })
-    setTxt(doc, C.gray900)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
-    doc.text(eyeStr(exam.left_zone, exam.left_stage, exam.left_plus), lx + eyeW / 2, ey + 15, { align: 'center' })
-    setTxt(doc, C.gray500)
-    doc.setFontSize(7.5)
-    doc.text(`Plus Disease: ${PLUS_LABELS[exam.left_plus] || 'None'}`, lx + eyeW / 2, ey + 23, { align: 'center' })
-
-    ey += eyeH + 6
-
-    // Additional details table
+    // Additional details
     const detailRows = []
     if (exam.postnatal_age_days != null) detailRows.push(['Postnatal Age at Exam', `${exam.postnatal_age_days} days`])
     if (exam.treatment_recommended) detailRows.push(['Treatment Recommended', TREATMENT_LABELS[exam.treatment_recommended] || exam.treatment_recommended])
     if (exam.next_exam_weeks) detailRows.push(['Next Exam', `In ${exam.next_exam_weeks} week${exam.next_exam_weeks > 1 ? 's' : ''}`])
 
     if (detailRows.length) {
-      autoTable(doc, {
+      bwTable(doc, {
         startY: ey,
         margin: { left: ML, right: MR },
         body: detailRows,
-        styles: { fontSize: 9, cellPadding: 3 },
-        columnStyles: { 0: { fontStyle: 'bold', textColor: C.gray500, cellWidth: 55 } },
-        alternateRowStyles: { fillColor: C.gray100 },
+        styles: { fontSize: 10, cellPadding: 2.5 },
+        columnStyles: {
+          0: { font: 'helvetica', fontStyle: 'bold', fontSize: 9, textColor: BW.label, cellWidth: 55 },
+        },
       })
       ey = doc.lastAutoTable.finalY + 6
     }
 
     if (exam.notes) {
-      ey = sectionHeading(doc, ey, 'Clinical Notes')
-      setTxt(doc, C.gray700)
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(9)
+      ey = bwSectionHeading(doc, ey, 'Clinical Notes')
+      setTxt(doc, BW.black)
+      doc.setFont('times', 'normal')
+      doc.setFontSize(10)
       const lines = doc.splitTextToSize(exam.notes, CW - 6)
       doc.text(lines, ML + 3, ey)
       ey += lines.length * 5 + 6
     }
 
     if (hasVFData(exam)) {
-      ey = addVFSection(doc, exam, ey)
+      ey = addVFSectionBW(doc, exam, ey)
     }
 
-    // Signature block on each exam page
+    // Signature block
     ey = Math.max(ey + 10, PH - 45)
     const sigCols = [ML, ML + CW / 3, ML + (CW / 3) * 2]
     const sigW = CW / 3 - 4
     const sigLabels = ['Examined by', 'Signature', 'Date']
+    setDraw(doc, BW.border)
+    doc.setLineWidth(0.3)
     for (let si = 0; si < 3; si++) {
       doc.line(sigCols[si], ey + 15, sigCols[si] + sigW, ey + 15)
-      setTxt(doc, C.gray500)
+      setTxt(doc, BW.label)
       doc.setFont('helvetica', 'normal')
-      doc.setFontSize(7.5)
-      doc.text(sigLabels[si], sigCols[si], ey + 20)
+      doc.setFontSize(8)
+      doc.text(sigLabels[si], sigCols[si], ey + 21)
     }
 
-    addFooter(doc, ei + 2, totalPages)
+    bwFooter(doc, ei + 2, totalPages)
   }
 
   doc.save(`ROP-Record-${baby.full_name.replace(/\s+/g, '-')}-${Date.now()}.pdf`)
