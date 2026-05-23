@@ -301,28 +301,6 @@ function AntBoolToggle({ value, onChange }) {
   )
 }
 
-function RVToggle({ value, onChange }) {
-  const opts = [['immature', 'Immature'], ['mature', 'Mature'], ['rop', 'ROP']]
-  return (
-    <div style={{ display: 'flex', gap: '.3rem', flexWrap: 'wrap' }}>
-      {opts.map(([v, l]) => (
-        <button key={v} type="button"
-          onClick={() => onChange(value === v ? null : v)}
-          style={{
-            padding: '.18rem .6rem', borderRadius: 4, fontSize: '.78rem', fontWeight: 600,
-            border: '1.5px solid',
-            borderColor: value === v ? 'var(--teal-600)' : 'var(--gray-300)',
-            background: value === v ? 'var(--teal-600)' : 'white',
-            color: value === v ? 'white' : 'var(--gray-500)',
-            cursor: 'pointer',
-          }}
-        >
-          {l}
-        </button>
-      ))}
-    </div>
-  )
-}
 
 const ANT_ROWS = [
   ['active_iris',  'Active Iris Vasculature'],
@@ -436,22 +414,6 @@ function AnteriorSegmentSection({ ant, setAnt, previousExams }) {
         </div>
       )}
 
-      {/* Retinal Vessel Maturity */}
-      <div style={{ background: 'var(--gray-50)', borderRadius: 'var(--radius)', padding: '1rem' }}>
-        <div style={{ fontSize: '.72rem', fontWeight: 700, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.75rem' }}>
-          Retinal Vessel Maturity
-        </div>
-        <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
-          <div>
-            <div style={{ fontSize: '.75rem', color: 'var(--gray-600)', marginBottom: '.35rem', fontWeight: 600 }}>Right Eye</div>
-            <RVToggle value={ant.rv_right} onChange={v => set('rv_right', v)} />
-          </div>
-          <div>
-            <div style={{ fontSize: '.75rem', color: 'var(--gray-600)', marginBottom: '.35rem', fontWeight: 600 }}>Left Eye</div>
-            <RVToggle value={ant.rv_left} onChange={v => set('rv_left', v)} />
-          </div>
-        </div>
-      </div>
     </div>
   )
 }
@@ -537,7 +499,6 @@ export default function RecordExamPage() {
     right_rigid_pupil: null, left_rigid_pupil: null,
     right_others: null, left_others: null,
     right_others_specify: '', left_others_specify: '',
-    rv_right: null, rv_left: null,
   })
 
   const handleFieldChange = (key, value) => setFields(prev => ({ ...prev, [key]: value }))
@@ -578,8 +539,6 @@ export default function RecordExamPage() {
         ant_left_others:       anteriorSegment.left_others,
         ant_right_others_specify: anteriorSegment.right_others_specify || null,
         ant_left_others_specify:  anteriorSegment.left_others_specify || null,
-        rv_right: anteriorSegment.rv_right || null,
-        rv_left:  anteriorSegment.rv_left  || null,
       }
       await recordExam({
         baby_id: id, exam_date: examDate,
@@ -640,6 +599,9 @@ export default function RecordExamPage() {
           </div>
         </div>
 
+        {/* Anterior Segment Examination */}
+        <AnteriorSegmentSection ant={anteriorSegment} setAnt={setAnteriorSegment} previousExams={previousExams} />
+
         {/* Eye findings */}
         <div className="card" style={{ marginBottom: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.9rem' }}>
@@ -656,9 +618,6 @@ export default function RecordExamPage() {
 
         {/* Visual Function Assessment */}
         <VisualFunctionSection vf={vf} setVf={setVf} previousExams={previousExams} />
-
-        {/* Anterior Segment Examination */}
-        <AnteriorSegmentSection ant={anteriorSegment} setAnt={setAnteriorSegment} previousExams={previousExams} />
 
         {/* Scheduling banner */}
         <div style={{ marginBottom: '1rem' }}>
