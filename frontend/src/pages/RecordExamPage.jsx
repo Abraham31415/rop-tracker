@@ -278,6 +278,184 @@ function VisualFunctionSection({ vf, setVf, previousExams }) {
   )
 }
 
+// ── Anterior Segment section ──────────────────────────────────────────────────
+function AntBoolToggle({ value, onChange }) {
+  return (
+    <div style={{ display: 'flex', gap: '.3rem', justifyContent: 'center' }}>
+      {[true, false].map(opt => (
+        <button key={String(opt)} type="button"
+          onClick={() => onChange(value === opt ? null : opt)}
+          style={{
+            padding: '.18rem .6rem', borderRadius: 4, fontSize: '.78rem', fontWeight: 600,
+            border: '1.5px solid',
+            borderColor: value === opt ? (opt ? 'var(--teal-600)' : '#64748b') : 'var(--gray-300)',
+            background: value === opt ? (opt ? 'var(--teal-600)' : '#64748b') : 'white',
+            color: value === opt ? 'white' : 'var(--gray-500)',
+            cursor: 'pointer',
+          }}
+        >
+          {opt ? 'Yes' : 'No'}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function RVToggle({ value, onChange }) {
+  const opts = [['immature', 'Immature'], ['mature', 'Mature'], ['rop', 'ROP']]
+  return (
+    <div style={{ display: 'flex', gap: '.3rem', flexWrap: 'wrap' }}>
+      {opts.map(([v, l]) => (
+        <button key={v} type="button"
+          onClick={() => onChange(value === v ? null : v)}
+          style={{
+            padding: '.18rem .6rem', borderRadius: 4, fontSize: '.78rem', fontWeight: 600,
+            border: '1.5px solid',
+            borderColor: value === v ? 'var(--teal-600)' : 'var(--gray-300)',
+            background: value === v ? 'var(--teal-600)' : 'white',
+            color: value === v ? 'white' : 'var(--gray-500)',
+            cursor: 'pointer',
+          }}
+        >
+          {l}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+const ANT_ROWS = [
+  ['active_iris',  'Active Iris Vasculature'],
+  ['tvl',          'Tunica Vasculosa Lentis (TVL)'],
+  ['rigid_pupil',  'Rigid Pupil'],
+  ['others',       'Others'],
+]
+
+function AnteriorSegmentSection({ ant, setAnt, previousExams }) {
+  const hasPreviousAnt = (previousExams || []).some(e =>
+    e.ant_right_active_iris != null || e.ant_left_active_iris != null ||
+    e.rv_right != null || e.rv_left != null
+  )
+  const [expanded, setExpanded] = useState(hasPreviousAnt)
+  const set = (key, val) => setAnt(prev => ({ ...prev, [key]: val }))
+
+  if (!expanded) {
+    return (
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          style={{
+            width: '100%', background: 'none', border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: '.6rem', padding: 0,
+            color: 'var(--teal-600)', fontSize: '.87rem', fontWeight: 600,
+          }}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 16, height: 16 }}>
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+          Add Anterior Segment Examination (optional)
+        </button>
+        <p style={{ fontSize: '.75rem', color: 'var(--gray-400)', margin: '.4rem 0 0 1.6rem' }}>
+          Active iris vasculature, TVL, pupil reactivity, retinal vessel maturity.
+        </p>
+      </div>
+    )
+  }
+
+  const cellStyle = { padding: '.5rem .75rem', borderBottom: '1px solid var(--gray-200)', verticalAlign: 'middle' }
+
+  return (
+    <div className="card" style={{ marginBottom: '1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1rem' }}>
+        <div>
+          <div style={{ fontSize: '.7rem', fontWeight: 700, color: 'var(--teal-600)', textTransform: 'uppercase', letterSpacing: '.09em' }}>
+            Anterior Segment Examination
+          </div>
+          <div style={{ fontSize: '.75rem', color: 'var(--gray-500)', marginTop: '.15rem' }}>
+            All fields optional. Click Yes or No; click again to clear.
+          </div>
+        </div>
+        <button type="button" onClick={() => setExpanded(false)}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '.75rem', color: 'var(--gray-400)', padding: '.2rem .4rem' }}>
+          Collapse ▲
+        </button>
+      </div>
+
+      {/* Boolean findings table */}
+      <div style={{ overflowX: 'auto', marginBottom: '1rem' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.82rem' }}>
+          <thead>
+            <tr style={{ background: 'var(--gray-50)' }}>
+              <th style={{ ...cellStyle, textAlign: 'left', fontWeight: 700, color: 'var(--gray-600)', fontSize: '.72rem', textTransform: 'uppercase', letterSpacing: '.06em', width: '44%' }}>
+                Finding
+              </th>
+              <th style={{ ...cellStyle, textAlign: 'center', fontWeight: 700, color: 'var(--gray-600)', fontSize: '.72rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                Right Eye (RE)
+              </th>
+              <th style={{ ...cellStyle, textAlign: 'center', fontWeight: 700, color: 'var(--gray-600)', fontSize: '.72rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                Left Eye (LE)
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {ANT_ROWS.map(([key, label]) => (
+              <tr key={key}>
+                <td style={{ ...cellStyle, color: 'var(--gray-700)' }}>{label}</td>
+                <td style={{ ...cellStyle }}>
+                  <AntBoolToggle value={ant[`right_${key}`]} onChange={v => set(`right_${key}`, v)} />
+                </td>
+                <td style={{ ...cellStyle }}>
+                  <AntBoolToggle value={ant[`left_${key}`]} onChange={v => set(`left_${key}`, v)} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Specify fields when Others = Yes */}
+      {(ant.right_others === true || ant.left_others === true) && (
+        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+          {ant.right_others === true && (
+            <div className="form-group" style={{ flex: 1, minWidth: 180 }}>
+              <label className="form-label">RE Others - specify</label>
+              <input type="text" value={ant.right_others_specify}
+                onChange={e => set('right_others_specify', e.target.value)}
+                placeholder="Specify right eye finding..." />
+            </div>
+          )}
+          {ant.left_others === true && (
+            <div className="form-group" style={{ flex: 1, minWidth: 180 }}>
+              <label className="form-label">LE Others - specify</label>
+              <input type="text" value={ant.left_others_specify}
+                onChange={e => set('left_others_specify', e.target.value)}
+                placeholder="Specify left eye finding..." />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Retinal Vessel Maturity */}
+      <div style={{ background: 'var(--gray-50)', borderRadius: 'var(--radius)', padding: '1rem' }}>
+        <div style={{ fontSize: '.72rem', fontWeight: 700, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.75rem' }}>
+          Retinal Vessel Maturity
+        </div>
+        <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontSize: '.75rem', color: 'var(--gray-600)', marginBottom: '.35rem', fontWeight: 600 }}>Right Eye</div>
+            <RVToggle value={ant.rv_right} onChange={v => set('rv_right', v)} />
+          </div>
+          <div>
+            <div style={{ fontSize: '.75rem', color: 'var(--gray-600)', marginBottom: '.35rem', fontWeight: 600 }}>Left Eye</div>
+            <RVToggle value={ant.rv_left} onChange={v => set('rv_left', v)} />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Scheduling banner ─────────────────────────────────────────────────────────
 function SchedulingBanner({ fields, examDate }) {
   const { worstZone, worstStage, hasPlus } = deriveWorstFinding(
@@ -353,6 +531,15 @@ export default function RecordExamPage() {
     functional_impression: '', vf_notes: '',
   })
 
+  const [anteriorSegment, setAnteriorSegment] = useState({
+    right_active_iris: null, left_active_iris: null,
+    right_tvl: null, left_tvl: null,
+    right_rigid_pupil: null, left_rigid_pupil: null,
+    right_others: null, left_others: null,
+    right_others_specify: '', left_others_specify: '',
+    rv_right: null, rv_left: null,
+  })
+
   const handleFieldChange = (key, value) => setFields(prev => ({ ...prev, [key]: value }))
 
   const handleSubmit = async e => {
@@ -380,6 +567,20 @@ export default function RecordExamPage() {
         vf_functional_impression: vf.functional_impression || null,
         vf_notes: vf.vf_notes || null,
       }
+      const antPayload = {
+        ant_right_active_iris: anteriorSegment.right_active_iris,
+        ant_left_active_iris:  anteriorSegment.left_active_iris,
+        ant_right_tvl:         anteriorSegment.right_tvl,
+        ant_left_tvl:          anteriorSegment.left_tvl,
+        ant_right_rigid_pupil: anteriorSegment.right_rigid_pupil,
+        ant_left_rigid_pupil:  anteriorSegment.left_rigid_pupil,
+        ant_right_others:      anteriorSegment.right_others,
+        ant_left_others:       anteriorSegment.left_others,
+        ant_right_others_specify: anteriorSegment.right_others_specify || null,
+        ant_left_others_specify:  anteriorSegment.left_others_specify || null,
+        rv_right: anteriorSegment.rv_right || null,
+        rv_left:  anteriorSegment.rv_left  || null,
+      }
       await recordExam({
         baby_id: id, exam_date: examDate,
         postnatal_age_days: postnatalAge ? parseInt(postnatalAge) : null,
@@ -387,6 +588,7 @@ export default function RecordExamPage() {
         left_zone:  fields.left_zone  || null, left_stage:  fields.left_stage  || null, left_plus:  fields.left_plus  || 'none',
         treatment_recommended: treatment || null, notes: notes || null,
         ...vfPayload,
+        ...antPayload,
       })
       navigate(`/babies/${id}`)
     } catch (err) {
@@ -454,6 +656,9 @@ export default function RecordExamPage() {
 
         {/* Visual Function Assessment */}
         <VisualFunctionSection vf={vf} setVf={setVf} previousExams={previousExams} />
+
+        {/* Anterior Segment Examination */}
+        <AnteriorSegmentSection ant={anteriorSegment} setAnt={setAnteriorSegment} previousExams={previousExams} />
 
         {/* Scheduling banner */}
         <div style={{ marginBottom: '1rem' }}>
