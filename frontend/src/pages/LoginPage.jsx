@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 function IconEye() {
@@ -14,10 +14,16 @@ function IconEye() {
 export default function LoginPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // If the user was redirected here from a protected page (e.g. by scanning a
+  // QR code), send them back to that page after a successful login instead of
+  // dropping them at the dashboard.
+  const from = location.state?.from?.pathname || '/dashboard'
 
   const handleSubmit = async e => {
     e.preventDefault()
@@ -25,7 +31,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await login(email, password)
-      navigate('/dashboard')
+      navigate(from, { replace: true })
     } catch (err) {
       setError(err.response?.data?.detail || 'Login failed. Check your credentials.')
     } finally {

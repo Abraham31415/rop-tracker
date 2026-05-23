@@ -579,7 +579,7 @@ function addVFSectionBW(doc, exam, yStart) {
 // ─────────────────────────────────────────────────────────────────────────────
 export async function generateSingleVisitPDF(baby, exam, hospitalName) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
-  const babyUrl = `${window.location.origin}/babies/${baby.id}`
+  const babyUrl = `https://rop-tracker.vercel.app/babies/${baby.id}`
   const qr = await qrDataUrlBW(babyUrl)
 
   // ── Header: text left, QR right ───────────────────────────────────────────
@@ -758,7 +758,7 @@ export async function generateSingleVisitPDF(baby, exam, hospitalName) {
 // ─────────────────────────────────────────────────────────────────────────────
 export async function generateBabyFullPDF(baby, exams, hospitalName) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
-  const babyUrl = `${window.location.origin}/babies/${baby.id}`
+  const babyUrl = `https://rop-tracker.vercel.app/babies/${baby.id}`
   const qr = await qrDataUrlBW(babyUrl)
 
   const sortedExams = [...exams].sort((a, b) => new Date(b.exam_date) - new Date(a.exam_date))
