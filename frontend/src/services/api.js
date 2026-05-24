@@ -35,6 +35,11 @@ export const listExams = (babyId) => api.get(`/api/exams/baby/${babyId}`).then(r
 // ── Hospital endpoints ────────────────────────────────────────────────────────
 export const listHospitals = () => api.get('/api/hospitals/').then(r => r.data)
 
+export const createHospital = (data) => api.post('/api/hospitals/', data).then(r => r.data)
+
+export const checkHospitalCode = (code) =>
+  api.get(`/api/hospitals/check-code/${encodeURIComponent(code)}`).then(r => r.data)
+
 // ── Network overview (central coordinator) ───────────────────────────────────
 export const getNetworkOverview = () => api.get('/api/network/overview').then(r => r.data)
 

@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   listUsers, createUser, deactivateUser, activateUser,
-  listHospitals, getTemplates, updateTemplate, resetTemplate,
+  listHospitals, createHospital, checkHospitalCode,
+  getTemplates, updateTemplate, resetTemplate,
   getGatewayStatus, sendTestSms,
 } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
@@ -144,19 +145,111 @@ function UsersTab() {
   )
 }
 
-// ── Hospitals tab ────────────────────────────────────────────────────────────
+// ── Hospitals tab helpers ─────────────────────────────────────────────────────
+const HOSPITAL_TYPES = [
+  { value: 'national_referral', label: 'National Referral Hospital' },
+  { value: 'regional_referral', label: 'Regional Referral Hospital' },
+  { value: 'general',           label: 'General Hospital' },
+  { value: 'private',           label: 'Private Hospital' },
+  { value: 'health_centre_iv',  label: 'Health Centre IV' },
+]
+const HOSPITAL_TYPE_LABELS = Object.fromEntries(HOSPITAL_TYPES.map(t => [t.value, t.label]))
+
+const CODE_SKIP = new Set(['of', 'the', 'and', 'a', 'an', 'in', 'at', 'for', 'to', 'by'])
+function suggestHospitalCode(name) {
+  const words = name.replace(/[^a-zA-Z\s]/g, ' ').split(/\s+/).filter(w => w && !CODE_SKIP.has(w.toLowerCase()))
+  if (!words.length) return ''
+  const letters = words.map(w => w[0].toUpperCase())
+  if (letters.length >= 3) return letters.slice(0, 3).join('')
+  let code = letters.join('')
+  const first = words[0].toUpperCase()
+  let i = 1
+  while (code.length < 3 && i < first.length) { code += first[i]; i++ }
+  return code.slice(0, 3)
+}
+
+const EMPTY_HOSPITAL_FORM = { name: '', district: '', region: '', hospital_type: '', hospital_code: '', physical_address: '', contact_phone: '' }
+
+// ── Hospitals tab ─────────────────────────────────────────────────────────────
 function HospitalsTab() {
   const qc = useQueryClient()
   const { data: hospitals = [], isLoading } = useQuery({ queryKey: ['hospitals'], queryFn: listHospitals })
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ name: '', district: '', region: '' })
+  const [form, setForm] = useState(EMPTY_HOSPITAL_FORM)
   const [formErr, setFormErr] = useState('')
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  // Auto-suggest code from name (until manually edited)
+  const codeManuallyEdited = useRef(false)
+  useEffect(() => {
+    if (codeManuallyEdited.current) return
+    const s = suggestHospitalCode(form.name)
+    if (s) set('hospital_code', s)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.name])
+
+  // Live code availability check
+  const [codeStatus, setCodeStatus] = useState(null)
+  const [codeChecking, setCodeChecking] = useState(false)
+  const codeTimer = useRef(null)
+  useEffect(() => {
+    const code = form.hospital_code
+    if (!code || !/^[A-Z]{3}$/.test(code)) { setCodeStatus(null); return }
+    clearTimeout(codeTimer.current)
+    setCodeChecking(true)
+    codeTimer.current = setTimeout(async () => {
+      try { setCodeStatus(await checkHospitalCode(code)) }
+      catch { setCodeStatus(null) }
+      finally { setCodeChecking(false) }
+    }, 400)
+    return () => clearTimeout(codeTimer.current)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.hospital_code])
+
+  const codeFormatOk = !form.hospital_code || /^[A-Z]{3}$/.test(form.hospital_code)
+  const codeTaken    = !codeChecking && codeStatus && !codeStatus.available && codeStatus.taken_by
+  const codeOk       = !codeChecking && codeStatus?.available === true
 
   const createMut = useMutation({
-    mutationFn: (data) => import('../services/api').then(m => m.default.post('/api/hospitals/', data).then(r => r.data)),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['hospitals'] }); setShowForm(false); setForm({ name: '', district: '', region: '' }) },
+    mutationFn: createHospital,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['hospitals'] })
+      setShowForm(false)
+      setForm(EMPTY_HOSPITAL_FORM)
+      setFormErr('')
+      setCodeStatus(null)
+      codeManuallyEdited.current = false
+    },
     onError: (e) => setFormErr(e.response?.data?.detail || 'Failed to add hospital'),
   })
+
+  const canSubmit = form.name.trim() && form.district.trim() && form.region.trim() &&
+    codeFormatOk && !codeTaken && !codeChecking && !createMut.isPending
+
+  function handleAdd() {
+    setFormErr('')
+    const payload = {
+      name: form.name.trim(),
+      district: form.district.trim(),
+      region: form.region.trim(),
+      hospital_type: form.hospital_type || null,
+      hospital_code: form.hospital_code || null,
+      physical_address: form.physical_address || null,
+      contact_phone: form.contact_phone || null,
+    }
+    createMut.mutate(payload)
+  }
+
+  function handleCancel() {
+    setShowForm(false)
+    setForm(EMPTY_HOSPITAL_FORM)
+    setFormErr('')
+    setCodeStatus(null)
+    codeManuallyEdited.current = false
+  }
+
+  const year = new Date().getFullYear().toString().slice(-2)
+  const codePreview = codeOk ? `${form.hospital_code}-${year}-00001` : null
 
   return (
     <div>
@@ -168,45 +261,147 @@ function HospitalsTab() {
       </div>
 
       {showForm && (
-        <div className="settings-form-card">
+        <div className="settings-form-card" style={{ marginBottom: '1.5rem' }}>
           <div className="settings-form-title">Add Hospital to Network</div>
           {formErr && <div className="form-error" style={{ marginBottom: '.75rem' }}>{formErr}</div>}
+
           <div className="settings-form-grid">
-            <div className="form-group">
-              <label>Hospital Name</label>
-              <input className="form-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Mulago National Referral Hospital" />
+            {/* Name */}
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <label>Hospital Name *</label>
+              <input className="form-input" value={form.name}
+                onChange={e => set('name', e.target.value)}
+                placeholder="Mulago National Referral Hospital" />
             </div>
+            {/* District */}
             <div className="form-group">
-              <label>District</label>
-              <input className="form-input" value={form.district} onChange={e => setForm(f => ({ ...f, district: e.target.value }))} placeholder="Kampala" />
+              <label>District *</label>
+              <input className="form-input" value={form.district}
+                onChange={e => set('district', e.target.value)}
+                placeholder="Kampala" />
             </div>
+            {/* Region */}
             <div className="form-group">
-              <label>Region</label>
-              <input className="form-input" value={form.region} onChange={e => setForm(f => ({ ...f, region: e.target.value }))} placeholder="Central" />
+              <label>Region *</label>
+              <input className="form-input" value={form.region}
+                onChange={e => set('region', e.target.value)}
+                placeholder="Central" />
+            </div>
+            {/* Type */}
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <label>Hospital Type <span style={{ color: 'var(--gray-400)', fontWeight: 400 }}>(optional)</span></label>
+              <select className="form-input" value={form.hospital_type} onChange={e => set('hospital_type', e.target.value)}>
+                <option value="">Select type...</option>
+                {HOSPITAL_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+            {/* Hospital code */}
+            <div className="form-group">
+              <label>
+                Hospital Code <span style={{ color: 'var(--gray-400)', fontWeight: 400 }}>(3 letters, needed for ROP IDs)</span>
+              </label>
+              <input
+                className="form-input"
+                value={form.hospital_code}
+                onChange={e => {
+                  codeManuallyEdited.current = true
+                  set('hospital_code', e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3))
+                }}
+                placeholder="e.g. MNR"
+                maxLength={3}
+                style={{
+                  fontFamily: 'var(--font-mono, monospace)', fontWeight: 700, letterSpacing: '.1em',
+                  borderColor: codeTaken ? 'var(--red-500)' : codeOk ? 'var(--green-500)' : undefined,
+                }}
+              />
+              {form.hospital_code && !codeFormatOk && (
+                <div style={{ color: 'var(--red-600)', fontSize: '.75rem', marginTop: '.3rem' }}>Must be exactly 3 letters</div>
+              )}
+              {codeChecking && (
+                <div style={{ color: 'var(--gray-400)', fontSize: '.75rem', marginTop: '.3rem' }}>Checking...</div>
+              )}
+              {codeTaken && (
+                <div style={{ color: 'var(--red-600)', fontSize: '.75rem', marginTop: '.3rem' }}>
+                  Code {form.hospital_code} is already used by {codeStatus.taken_by}
+                </div>
+              )}
+              {codeOk && (
+                <div style={{ color: 'var(--green-700)', fontSize: '.75rem', marginTop: '.3rem' }}>
+                  Code available
+                </div>
+              )}
+            </div>
+            {/* ROP ID preview */}
+            <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
+              {codePreview ? (
+                <div style={{
+                  padding: '.45rem .75rem', background: 'var(--teal-50)', border: '1px solid var(--teal-200)',
+                  borderRadius: 'var(--radius-sm)', fontSize: '.82rem', color: 'var(--teal-700)',
+                }}>
+                  Baby IDs will appear as: <strong style={{ fontFamily: 'var(--font-mono, monospace)' }}>{codePreview}</strong>
+                </div>
+              ) : (
+                <div style={{ fontSize: '.8rem', color: 'var(--amber-600, #d97706)', fontStyle: 'italic' }}>
+                  No code set - babies here will not receive ROP IDs
+                </div>
+              )}
+            </div>
+            {/* Address */}
+            <div className="form-group">
+              <label>Physical Address <span style={{ color: 'var(--gray-400)', fontWeight: 400 }}>(optional)</span></label>
+              <input className="form-input" value={form.physical_address}
+                onChange={e => set('physical_address', e.target.value)}
+                placeholder="e.g. Kawempe, Kampala" />
+            </div>
+            {/* Phone */}
+            <div className="form-group">
+              <label>Contact Phone <span style={{ color: 'var(--gray-400)', fontWeight: 400 }}>(optional)</span></label>
+              <input className="form-input" value={form.contact_phone}
+                onChange={e => set('contact_phone', e.target.value)}
+                placeholder="+256 772 000 000" />
             </div>
           </div>
-          <button className="btn btn-primary" style={{ marginTop: '.75rem' }} onClick={() => createMut.mutate(form)} disabled={createMut.isPending}>
-            {createMut.isPending ? 'Adding…' : 'Add Hospital'}
-          </button>
+
+          <div style={{ display: 'flex', gap: '.75rem', marginTop: '1rem' }}>
+            <button className="btn btn-primary" onClick={handleAdd} disabled={!canSubmit}>
+              {createMut.isPending ? 'Adding...' : 'Add Hospital'}
+            </button>
+            <button className="btn btn-secondary" onClick={handleCancel}>Cancel</button>
+          </div>
         </div>
       )}
 
       {isLoading ? <div className="spinner-center"><div className="spinner" /></div> : (
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           <div className="card-table-wrap">
-          <table className="babies-table">
-            <thead><tr><th>Hospital</th><th>District</th><th>Region</th><th>Status</th></tr></thead>
-            <tbody>
-              {hospitals.map(h => (
-                <tr key={h.id}>
-                  <td style={{ fontWeight: 500 }}>{h.name}</td>
-                  <td style={{ fontSize: '.83rem' }}>{h.district}</td>
-                  <td style={{ fontSize: '.83rem' }}>{h.region}</td>
-                  <td><span className="badge badge-on_track" style={{ fontSize: '.72rem' }}>Active</span></td>
+            <table className="babies-table">
+              <thead>
+                <tr>
+                  <th>Hospital</th>
+                  <th>Code</th>
+                  <th>District</th>
+                  <th>Region</th>
+                  <th>Type</th>
+                  <th>Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {hospitals.map(h => (
+                  <tr key={h.id}>
+                    <td style={{ fontWeight: 500 }}>{h.name}</td>
+                    <td>
+                      {h.hospital_code
+                        ? <code style={{ fontSize: '.8rem', fontWeight: 700 }}>{h.hospital_code}</code>
+                        : <span style={{ color: 'var(--gray-400)', fontSize: '.8rem' }}>-</span>}
+                    </td>
+                    <td style={{ fontSize: '.83rem' }}>{h.district}</td>
+                    <td style={{ fontSize: '.83rem' }}>{h.region}</td>
+                    <td style={{ fontSize: '.83rem' }}>{HOSPITAL_TYPE_LABELS[h.hospital_type] || '-'}</td>
+                    <td><span className="badge badge-on_track" style={{ fontSize: '.72rem' }}>Active</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
