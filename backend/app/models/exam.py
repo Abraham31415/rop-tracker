@@ -1,7 +1,7 @@
 from __future__ import annotations
 import uuid
 import enum
-from sqlalchemy import Column, String, Date, DateTime, ForeignKey, Enum, Text, Integer, Float
+from sqlalchemy import Column, String, Date, DateTime, ForeignKey, Enum, Text, Integer, Float, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -120,6 +120,22 @@ class Exam(Base):
     vf_strabismus = Column(Enum(Strabismus, name='strabismus', values_callable=lambda x: [e.name for e in x]), nullable=True)
     vf_functional_impression = Column(Enum(VFFunctionalImpression, name='vffunctionalimpression', values_callable=lambda x: [e.name for e in x]), nullable=True)
     vf_notes = Column(Text, nullable=True)
+
+    # Anterior Segment (True = present/Yes, False = absent/No, None = not assessed)
+    ant_right_active_iris  = Column(Boolean, nullable=True)   # Active iris vasculature
+    ant_left_active_iris   = Column(Boolean, nullable=True)
+    ant_right_tvl          = Column(Boolean, nullable=True)   # Tunica Vasculosa Lentis
+    ant_left_tvl           = Column(Boolean, nullable=True)
+    ant_right_rigid_pupil  = Column(Boolean, nullable=True)   # Rigid pupil
+    ant_left_rigid_pupil   = Column(Boolean, nullable=True)
+    ant_right_others       = Column(Boolean, nullable=True)   # Others
+    ant_left_others        = Column(Boolean, nullable=True)
+    ant_right_others_specify = Column(String(200), nullable=True)
+    ant_left_others_specify  = Column(String(200), nullable=True)
+
+    # Retinal Vessel Maturity  (immature / mature / rop)
+    rv_right = Column(String(20), nullable=True)
+    rv_left  = Column(String(20), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

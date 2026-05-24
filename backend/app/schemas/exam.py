@@ -37,6 +37,20 @@ class ExamCreate(BaseModel):
     vf_functional_impression: Optional[VFFunctionalImpression] = None
     vf_notes: Optional[str] = None
 
+    # Anterior segment
+    ant_right_active_iris: Optional[bool] = None
+    ant_left_active_iris: Optional[bool] = None
+    ant_right_tvl: Optional[bool] = None
+    ant_left_tvl: Optional[bool] = None
+    ant_right_rigid_pupil: Optional[bool] = None
+    ant_left_rigid_pupil: Optional[bool] = None
+    ant_right_others: Optional[bool] = None
+    ant_left_others: Optional[bool] = None
+    ant_right_others_specify: Optional[str] = None
+    ant_left_others_specify: Optional[str] = None
+    rv_right: Optional[str] = None
+    rv_left: Optional[str] = None
+
 
 class ExamOut(BaseModel):
     id: UUID
@@ -69,6 +83,21 @@ class ExamOut(BaseModel):
     vf_strabismus: Optional[Strabismus]
     vf_functional_impression: Optional[VFFunctionalImpression]
     vf_notes: Optional[str]
+
+    # Anterior segment
+    ant_right_active_iris: Optional[bool]
+    ant_left_active_iris: Optional[bool]
+    ant_right_tvl: Optional[bool]
+    ant_left_tvl: Optional[bool]
+    ant_right_rigid_pupil: Optional[bool]
+    ant_left_rigid_pupil: Optional[bool]
+    ant_right_others: Optional[bool]
+    ant_left_others: Optional[bool]
+    ant_right_others_specify: Optional[str]
+    ant_left_others_specify: Optional[str]
+    rv_right: Optional[str]
+    rv_left: Optional[str]
+
     created_at: datetime
 
     model_config = {"from_attributes": True}
