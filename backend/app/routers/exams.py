@@ -22,11 +22,11 @@ def get_my_hospitals(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Return hospitals relevant to this ophthalmologist for the enroll form.
+    """Return hospitals relevant to this user for the exam / enroll form.
 
     Returns { recent: [...], all: [...] } where 'recent' are hospitals where
-    this ophthalmologist has previously recorded exams, and 'all' is every
-    active hospital in the system.
+    this user has previously recorded exams (ordered by most recent exam),
+    and 'all' is every other active hospital alphabetically.
     """
     if current_user.role not in (
         UserRole.OPHTHALMOLOGIST, UserRole.HOSPITAL_COORDINATOR, UserRole.CENTRAL_COORDINATOR
@@ -36,26 +36,33 @@ def get_my_hospitals(
     def _h(hospital: Hospital) -> dict:
         return {"id": str(hospital.id), "name": hospital.name, "district": hospital.district}
 
-    # Hospitals where this user has previously examined babies
-    examined_baby_ids = (
-        db.query(Exam.baby_id)
-        .filter(Exam.examiner_id == current_user.id)
-        .distinct()
-        .subquery()
-    )
-    recent_hospital_ids = (
-        db.query(Baby.hospital_id)
-        .filter(Baby.id.in_(examined_baby_ids))
-        .distinct()
+    all_hospitals = (
+        db.query(Hospital)
+        .filter(Hospital.is_active == True)
+        .order_by(Hospital.name)
         .all()
     )
-    recent_ids = {r[0] for r in recent_hospital_ids}
-    if current_user.hospital_id:
-        recent_ids.add(current_user.hospital_id)
+    hosp_map = {h.id: h for h in all_hospitals}
 
-    all_hospitals = db.query(Hospital).filter(Hospital.is_active == True).order_by(Hospital.name).all()
-    recent = [_h(h) for h in all_hospitals if h.id in recent_ids]
-    rest   = [_h(h) for h in all_hospitals if h.id not in recent_ids]
+    # Build ordered list of recently-used hospital IDs (most recent exam first)
+    recent_rows = (
+        db.query(Baby.hospital_id, Exam.exam_date)
+        .join(Baby, Exam.baby_id == Baby.id)
+        .filter(Exam.examiner_id == current_user.id)
+        .order_by(Exam.exam_date.desc())
+        .all()
+    )
+    seen_ids: list = []
+    for row in recent_rows:
+        if row.hospital_id not in seen_ids:
+            seen_ids.append(row.hospital_id)
+
+    # Also include the user's home hospital at the top of recent if not already there
+    if current_user.hospital_id and current_user.hospital_id not in seen_ids:
+        seen_ids.insert(0, current_user.hospital_id)
+
+    recent = [_h(hosp_map[hid]) for hid in seen_ids if hid in hosp_map]
+    rest   = [_h(h) for h in all_hospitals if h.id not in seen_ids]
 
     return {"recent": recent, "all": rest}
 
@@ -133,54 +140,3 @@ def list_exams_for_baby(
     return db.query(Exam).filter(Exam.baby_id == baby_id).order_by(Exam.exam_date.desc()).all()
 
 
-@router.get("/my-hospitals")
-def my_hospitals(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """
-    For ophthalmologists: returns two sections:
-      - recent: hospitals where this ophthalmologist has recorded exams, ordered by most recent exam
-      - all: all active hospitals, alphabetically, excluding those already in recent
-    """
-    all_hospitals = (
-        db.query(Hospital)
-        .filter(Hospital.is_active == True)
-        .order_by(Hospital.name)
-        .all()
-    )
-
-    if current_user.role != UserRole.OPHTHALMOLOGIST:
-        # For other roles just return all hospitals flat
-        return {
-            "recent": [],
-            "all": [{"id": str(h.id), "name": h.name, "district": h.district} for h in all_hospitals],
-        }
-
-    # Find hospitals where this ophthalmologist has exams, ordered by most recent
-    recent_rows = (
-        db.query(Baby.hospital_id, Exam.exam_date)
-        .join(Baby, Exam.baby_id == Baby.id)
-        .filter(Exam.examiner_id == current_user.id)
-        .order_by(Exam.exam_date.desc())
-        .all()
-    )
-
-    seen_ids: list[UUID] = []
-    for row in recent_rows:
-        if row.hospital_id not in seen_ids:
-            seen_ids.append(row.hospital_id)
-
-    hosp_map = {h.id: h for h in all_hospitals}
-    recent = [
-        {"id": str(hid), "name": hosp_map[hid].name, "district": hosp_map[hid].district}
-        for hid in seen_ids
-        if hid in hosp_map
-    ]
-    remaining = [
-        {"id": str(h.id), "name": h.name, "district": h.district}
-        for h in all_hospitals
-        if h.id not in seen_ids
-    ]
-
-    return {"recent": recent, "all": remaining}

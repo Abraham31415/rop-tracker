@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.auth.jwt import get_current_user
-from app.models.baby import Baby
+from app.models.baby import Baby, BabyStatus
 from app.models.outcome import Outcome, TreatmentType, TreatmentEye, VisualOutcome, DischargeStatus
 from app.models.user import User, UserRole
 from app.utils.audit import write_audit
@@ -94,11 +94,11 @@ def upsert_outcome(
 
     # Auto-update baby status based on discharge status
     if data.discharge_status in (DischargeStatus.COMPLETED_NO_ROP, DischargeStatus.COMPLETED_TREATED):
-        baby.status = "discharged"
+        baby.status = BabyStatus.DISCHARGED
     elif data.discharge_status in (DischargeStatus.LOST,):
-        baby.status = "ltfu"
+        baby.status = BabyStatus.LTFU
     elif data.treatment_type and data.treatment_type != TreatmentType.NONE:
-        baby.status = "treated"
+        baby.status = BabyStatus.TREATED
 
     action = "TREATMENT" if (data.treatment_type and data.treatment_type != TreatmentType.NONE) else "UPDATE"
     write_audit(

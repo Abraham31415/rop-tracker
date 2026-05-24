@@ -57,6 +57,7 @@ class ExamOut(BaseModel):
     baby_id: UUID
     exam_date: date
     postnatal_age_days: Optional[int]
+    postmenstrual_age_weeks: Optional[str]
     right_zone: Optional[Zone]
     right_stage: Optional[Stage]
     right_plus: Optional[PlusDisease]
