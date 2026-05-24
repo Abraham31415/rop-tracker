@@ -210,10 +210,10 @@ def _validate_hospital_code(code: str) -> str:
 
 class HospitalCreate(BaseModel):
     name: str
-    hospital_code: str
+    hospital_code: Optional[str] = None   # optional; 3 letters if supplied
     district: str
     region: str
-    hospital_type: str
+    hospital_type: Optional[str] = None
     physical_address: Optional[str] = None
     contact_phone: Optional[str] = None
 
@@ -697,6 +697,22 @@ def list_hospitals_admin(
     return [_hospital_out(h, db) for h in hospitals]
 
 
+@router.get("/hospitals/check-code/{code}")
+def check_hospital_code(
+    code: str,
+    db: Session = Depends(get_db),
+    _: dict = Depends(_verify_admin_token),
+):
+    """Real-time uniqueness check for a hospital code. Returns {available, code, taken_by?}."""
+    code_upper = code.strip().upper()
+    if not code_upper or len(code_upper) != 3 or not code_upper.isalpha():
+        return {"available": False, "code": code_upper, "reason": "Code must be exactly 3 letters"}
+    existing = db.query(Hospital).filter(Hospital.hospital_code == code_upper).first()
+    if existing:
+        return {"available": False, "code": code_upper, "taken_by": existing.name}
+    return {"available": True, "code": code_upper}
+
+
 @router.post("/hospitals", response_model=HospitalOut)
 def create_hospital_admin(
     request: Request,
@@ -706,12 +722,14 @@ def create_hospital_admin(
 ):
     if db.query(Hospital).filter(Hospital.name == data.name).first():
         raise HTTPException(status_code=400, detail="A hospital with that name already exists")
-    try:
-        code = _validate_hospital_code(data.hospital_code)
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-    if db.query(Hospital).filter(Hospital.hospital_code == code).first():
-        raise HTTPException(status_code=400, detail=f"Hospital code '{code}' is already in use by another hospital")
+    code: Optional[str] = None
+    if data.hospital_code:
+        try:
+            code = _validate_hospital_code(data.hospital_code)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+        if db.query(Hospital).filter(Hospital.hospital_code == code).first():
+            raise HTTPException(status_code=400, detail=f"Hospital code '{code}' is already in use by another hospital")
     payload = data.model_dump()
     payload["hospital_code"] = code
     hospital = Hospital(**payload)

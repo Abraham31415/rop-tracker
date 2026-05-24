@@ -1,9 +1,28 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   listHospitals, createHospital, updateHospital,
-  deactivateHospital, activateHospital,
+  deactivateHospital, activateHospital, checkHospitalCode,
 } from '../../services/adminApi'
+
+// ── Code suggestion from hospital name ───────────────────────────────────────
+const SKIP = new Set(['of', 'the', 'and', 'a', 'an', 'in', 'at', 'for', 'to', 'by'])
+
+function suggestCode(name) {
+  const words = name
+    .replace(/[^a-zA-Z\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w && !SKIP.has(w.toLowerCase()))
+  if (!words.length) return ''
+  const letters = words.map(w => w[0].toUpperCase())
+  if (letters.length >= 3) return letters.slice(0, 3).join('')
+  // Pad to 3 using subsequent letters of the first word
+  let code = letters.join('')
+  const first = words[0].toUpperCase()
+  let i = 1
+  while (code.length < 3 && i < first.length) { code += first[i]; i++ }
+  return code.slice(0, 3)
+}
 
 const HOSPITAL_TYPES = [
   { value: 'national_referral',  label: 'National Referral Hospital' },
@@ -90,20 +109,60 @@ function ConfirmDialog({ message, confirmWord, confirmLabel, onConfirm, onCancel
   )
 }
 
-function HospitalForm({ initial, onSave, onCancel, saving, error }) {
+function HospitalForm({ initial, isEdit, onSave, onCancel, saving, error }) {
   const [form, setForm] = useState(initial || EMPTY_FORM)
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  const codeValid = !form.hospital_code || /^[A-Za-z]{3}$/.test(form.hospital_code)
-  const canSubmit = ['name', 'district', 'region'].every(k => form[k].trim()) && codeValid
+  // Track whether the admin has manually typed in the code field
+  const codeManuallyEdited = useRef(!!initial?.hospital_code)
 
-  const codeUpper = form.hospital_code.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3)
+  // Auto-suggest code as name is typed (create mode only, before manual edit)
+  useEffect(() => {
+    if (isEdit || codeManuallyEdited.current) return
+    const suggestion = suggestCode(form.name)
+    if (suggestion) set('hospital_code', suggestion)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.name])
+
+  // Real-time availability check (debounced 400 ms)
+  const [codeStatus, setCodeStatus] = useState(null) // null | {available, code, taken_by?, reason?}
+  const [codeChecking, setCodeChecking] = useState(false)
+  const codeTimer = useRef(null)
+
+  useEffect(() => {
+    const code = form.hospital_code
+    if (!code || !/^[A-Z]{3}$/.test(code)) { setCodeStatus(null); return }
+    // In edit mode skip the check when the code hasn't changed
+    if (isEdit && initial?.hospital_code?.toUpperCase() === code) {
+      setCodeStatus({ available: true, code }); return
+    }
+    clearTimeout(codeTimer.current)
+    setCodeChecking(true)
+    codeTimer.current = setTimeout(async () => {
+      try { setCodeStatus(await checkHospitalCode(code)) }
+      catch { setCodeStatus(null) }
+      finally { setCodeChecking(false) }
+    }, 400)
+    return () => clearTimeout(codeTimer.current)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.hospital_code])
+
+  const codeFormatOk = !form.hospital_code || /^[A-Z]{3}$/.test(form.hospital_code)
+  const codeTaken    = !codeChecking && codeStatus && !codeStatus.available && codeStatus.taken_by
+  const codeOk       = !codeChecking && codeStatus?.available === true
+
+  const canSubmit =
+    ['name', 'district', 'region'].every(k => form[k].trim()) &&
+    codeFormatOk && !codeTaken && !codeChecking && !saving
+
   const year = new Date().getFullYear().toString().slice(-2)
-  const codePreview = codeUpper.length === 3 ? `${codeUpper}-${year}-00001` : null
+  const codeUpper = form.hospital_code.toUpperCase()
+  const showPreview = codeOk || (isEdit && initial?.hospital_code === codeUpper)
+  const codePreview = showPreview ? `${codeUpper}-${year}-00001` : null
 
   function handleSubmit(e) {
     e.preventDefault()
-    const payload = { ...form, hospital_code: form.hospital_code.toUpperCase() }
+    const payload = { ...form, hospital_code: form.hospital_code || null }
     if (!payload.physical_address) delete payload.physical_address
     if (!payload.contact_phone) delete payload.contact_phone
     onSave(payload)
@@ -139,19 +198,45 @@ function HospitalForm({ initial, onSave, onCancel, saving, error }) {
             ))}
           </select>
         </div>
+
+        {/* Code field with live validation */}
         <div>
-          <label style={labelStyle}>Hospital code <span style={{ color: '#94A3B8', fontWeight: 400 }}>(3 letters, needed for baby ROP IDs)</span></label>
+          <label style={labelStyle}>
+            Hospital code <span style={{ color: '#94A3B8', fontWeight: 400 }}>(3 letters, needed for baby ROP IDs)</span>
+          </label>
           <input
-            style={{ ...fieldStyle, textTransform: 'uppercase', fontFamily: 'monospace', fontWeight: 700, letterSpacing: '.1em' }}
+            style={{
+              ...fieldStyle,
+              textTransform: 'uppercase', fontFamily: 'monospace', fontWeight: 700, letterSpacing: '.1em',
+              borderColor: codeTaken ? '#EF4444' : codeOk ? '#22C55E' : '#CBD5E1',
+            }}
             value={form.hospital_code}
-            onChange={e => set('hospital_code', e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3))}
+            onChange={e => {
+              codeManuallyEdited.current = true
+              set('hospital_code', e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3))
+            }}
             placeholder="e.g. MNR"
             maxLength={3}
           />
-          {form.hospital_code && !/^[A-Z]{3}$/.test(form.hospital_code) && (
-            <div style={{ color: '#EF4444', fontSize: '.75rem', marginTop: '.25rem' }}>Must be exactly 3 letters</div>
+          {form.hospital_code && !codeFormatOk && (
+            <div style={{ color: '#EF4444', fontSize: '.75rem', marginTop: '.3rem' }}>Must be exactly 3 letters</div>
+          )}
+          {codeChecking && (
+            <div style={{ color: '#94A3B8', fontSize: '.75rem', marginTop: '.3rem' }}>Checking…</div>
+          )}
+          {codeTaken && (
+            <div style={{ color: '#EF4444', fontSize: '.75rem', marginTop: '.3rem' }}>
+              Code {codeUpper} is already used by {codeStatus.taken_by}
+            </div>
+          )}
+          {codeOk && (
+            <div style={{ color: '#16A34A', fontSize: '.75rem', marginTop: '.3rem' }}>
+              ✓ Code available
+            </div>
           )}
         </div>
+
+        {/* ROP ID preview or no-code warning */}
         <div style={{ display: 'flex', alignItems: 'flex-end' }}>
           {codePreview ? (
             <div style={{
@@ -161,9 +246,12 @@ function HospitalForm({ initial, onSave, onCancel, saving, error }) {
               Baby IDs will appear as: <strong style={{ fontFamily: 'monospace' }}>{codePreview}</strong>
             </div>
           ) : (
-            <div style={{ fontSize: '.8rem', color: '#F59E0B', fontStyle: 'italic' }}>No code set - babies at this hospital will not receive ROP IDs</div>
+            <div style={{ fontSize: '.8rem', color: '#F59E0B', fontStyle: 'italic' }}>
+              No code set - babies at this hospital will not receive ROP IDs
+            </div>
           )}
         </div>
+
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={labelStyle}>Physical address</label>
           <input style={fieldStyle} value={form.physical_address} onChange={e => set('physical_address', e.target.value)} placeholder="Optional" />
@@ -183,12 +271,12 @@ function HospitalForm({ initial, onSave, onCancel, saving, error }) {
           style={{ padding: '.5rem 1rem', border: '1px solid #CBD5E1', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: '.85rem' }}>
           Cancel
         </button>
-        <button type="submit" disabled={!canSubmit || saving}
+        <button type="submit" disabled={!canSubmit}
           style={{
             padding: '.5rem 1.25rem', border: 'none', borderRadius: 6,
-            background: canSubmit && !saving ? '#3B82F6' : '#93C5FD',
+            background: canSubmit ? '#3B82F6' : '#93C5FD',
             color: '#fff', fontWeight: 600, fontSize: '.85rem',
-            cursor: canSubmit && !saving ? 'pointer' : 'not-allowed',
+            cursor: canSubmit ? 'pointer' : 'not-allowed',
           }}>
           {saving ? 'Saving…' : 'Save hospital'}
         </button>
@@ -438,6 +526,7 @@ export default function AdminHospitalsPage() {
             </h2>
             <HospitalForm
               initial={formInitial}
+              isEdit={showForm !== 'create'}
               onSave={handleSave}
               onCancel={() => { setShowForm(false); setFormError('') }}
               saving={saving}
