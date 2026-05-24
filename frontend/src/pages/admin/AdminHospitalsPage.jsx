@@ -94,9 +94,8 @@ function HospitalForm({ initial, onSave, onCancel, saving, error }) {
   const [form, setForm] = useState(initial || EMPTY_FORM)
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  const required = ['name', 'district', 'region', 'hospital_type', 'hospital_code']
-  const canSubmit = required.every(k => form[k].trim()) &&
-    /^[A-Za-z]{3}$/.test(form.hospital_code)
+  const codeValid = !form.hospital_code || /^[A-Za-z]{3}$/.test(form.hospital_code)
+  const canSubmit = ['name', 'district', 'region'].every(k => form[k].trim()) && codeValid
 
   const codeUpper = form.hospital_code.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3)
   const year = new Date().getFullYear().toString().slice(-2)
@@ -132,8 +131,8 @@ function HospitalForm({ initial, onSave, onCancel, saving, error }) {
           <input style={fieldStyle} value={form.region} onChange={e => set('region', e.target.value)} required />
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
-          <label style={labelStyle}>Type *</label>
-          <select style={fieldStyle} value={form.hospital_type} onChange={e => set('hospital_type', e.target.value)} required>
+          <label style={labelStyle}>Type <span style={{ color: '#94A3B8', fontWeight: 400 }}>(optional)</span></label>
+          <select style={fieldStyle} value={form.hospital_type} onChange={e => set('hospital_type', e.target.value)}>
             <option value="">Select type…</option>
             {HOSPITAL_TYPES.map(t => (
               <option key={t.value} value={t.value}>{t.label}</option>
@@ -141,14 +140,13 @@ function HospitalForm({ initial, onSave, onCancel, saving, error }) {
           </select>
         </div>
         <div>
-          <label style={labelStyle}>Hospital code * <span style={{ color: '#94A3B8', fontWeight: 400 }}>(3 uppercase letters)</span></label>
+          <label style={labelStyle}>Hospital code <span style={{ color: '#94A3B8', fontWeight: 400 }}>(3 letters, needed for baby ROP IDs)</span></label>
           <input
             style={{ ...fieldStyle, textTransform: 'uppercase', fontFamily: 'monospace', fontWeight: 700, letterSpacing: '.1em' }}
             value={form.hospital_code}
             onChange={e => set('hospital_code', e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3))}
             placeholder="e.g. MNR"
             maxLength={3}
-            required
           />
           {form.hospital_code && !/^[A-Z]{3}$/.test(form.hospital_code) && (
             <div style={{ color: '#EF4444', fontSize: '.75rem', marginTop: '.25rem' }}>Must be exactly 3 letters</div>
@@ -163,7 +161,7 @@ function HospitalForm({ initial, onSave, onCancel, saving, error }) {
               Baby IDs will appear as: <strong style={{ fontFamily: 'monospace' }}>{codePreview}</strong>
             </div>
           ) : (
-            <div style={{ fontSize: '.8rem', color: '#94A3B8', fontStyle: 'italic' }}>Enter code to preview IDs</div>
+            <div style={{ fontSize: '.8rem', color: '#F59E0B', fontStyle: 'italic' }}>No code set - babies at this hospital will not receive ROP IDs</div>
           )}
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
@@ -284,12 +282,12 @@ export default function AdminHospitalsPage() {
               background: '#F0FDF4', color: '#166534', border: '1px solid #86EFAC',
               borderRadius: 4, padding: '2px 7px',
             }}>{h.hospital_code}</span>
-          ) : <span style={{ color: '#CBD5E1', fontSize: '.75rem' }}>—</span>}
+          ) : <span style={{ color: '#CBD5E1', fontSize: '.75rem' }}>-</span>}
         </td>
         <td style={{ padding: '.75rem 1rem', fontSize: '.8rem', color: '#64748B' }}>{h.district}</td>
         <td style={{ padding: '.75rem 1rem', fontSize: '.8rem', color: '#64748B' }}>{h.region}</td>
         <td style={{ padding: '.75rem 1rem', fontSize: '.8rem', color: '#64748B' }}>
-          {TYPE_LABELS[h.hospital_type] || h.hospital_type || '—'}
+          {TYPE_LABELS[h.hospital_type] || h.hospital_type || '-'}
         </td>
         <td style={{ padding: '.75rem 1rem' }}><Badge active={h.is_active} /></td>
         <td style={{ padding: '.75rem 1rem', fontSize: '.8rem', color: '#64748B', textAlign: 'center' }}>{h.baby_count}</td>
