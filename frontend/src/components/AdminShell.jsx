@@ -238,7 +238,7 @@ export default function AdminShell() {
           </button>
         </div>
 
-        <main style={{ flex: 1, padding: '1.75rem 2rem', overflow: 'auto' }}>
+        <main style={{ flex: 1, padding: '1.75rem 2rem', overflow: 'auto', background: '#F8FAFC' }}>
           <Outlet />
         </main>
       </div>
