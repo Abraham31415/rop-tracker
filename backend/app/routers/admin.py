@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import os
+import re
 import time
 import uuid
 import urllib.request
 import urllib.error
 import json as _json
 from datetime import date, datetime, timedelta, timezone
+from itertools import combinations
 from typing import Optional, Any
 from uuid import UUID
 
@@ -711,6 +713,119 @@ def check_hospital_code(
     if existing:
         return {"available": False, "code": code_upper, "taken_by": existing.name}
     return {"available": True, "code": code_upper}
+
+
+# ── Auto-generate hospital codes ──────────────────────────────────────────────
+
+_CODE_SKIP = frozenset({'of', 'the', 'and', 'a', 'an', 'in', 'at', 'for', 'to', 'by'})
+_GENERIC   = frozenset({'GENERAL', 'REGIONAL', 'REFERRAL', 'HOSPITAL', 'HEALTH',
+                        'CENTRE', 'CENTER', 'COMMUNITY', 'MEDICAL', 'NATIONAL', 'DISTRICT'})
+_VOWELS    = frozenset('AEIOU')
+
+
+def _significant_words(name: str) -> list[str]:
+    return [w.upper() for w in re.sub(r'[^\w\s]', ' ', name).split()
+            if w and w.lower() not in _CODE_SKIP]
+
+
+def _code_candidates(name: str) -> list[str]:
+    words = _significant_words(name)
+    if not words:
+        return []
+    seen: set[str] = set()
+    out: list[str] = []
+
+    def add(c: str) -> None:
+        c = c.upper()
+        if len(c) == 3 and c.isalpha() and c not in seen:
+            seen.add(c); out.append(c)
+
+    # Strategy 1: initials of first 3 significant words (padded if fewer)
+    letters = [w[0] for w in words]
+    code = ''.join(letters[:3])
+    if len(code) < 3 and words:
+        first = words[0]
+        i = 1
+        while len(code) < 3 and i < len(first):
+            code += first[i]; i += 1
+    add(code)
+
+    # Strategy 2: all combinations of 3 initials
+    for i, j, k in combinations(range(len(letters)), 3):
+        add(letters[i] + letters[j] + letters[k])
+
+    # Strategy 3: first 2 letters of first word + initial of each other word
+    prefix = words[0][:2]
+    for w in words[1:]:
+        add(prefix + w[0])
+
+    # Strategy 4: first letter + first 2 consonants of each location word
+    location = [w for w in words if w not in _GENERIC] or words
+    for lw in location:
+        consonants = [c for c in lw[1:] if c not in _VOWELS]
+        for i in range(len(consonants)):
+            for j in range(i + 1, len(consonants)):
+                add(lw[0] + consonants[i] + consonants[j])
+
+    # Strategy 5: first 3 letters of each location word
+    for lw in location:
+        add(lw[:3])
+
+    # Strategy 6: brute-force over all letters in the name
+    all_letters = list(dict.fromkeys(''.join(words)))
+    for i in range(len(all_letters)):
+        for j in range(len(all_letters)):
+            for k in range(len(all_letters)):
+                if i != j != k != i:
+                    add(all_letters[i] + all_letters[j] + all_letters[k])
+
+    return out
+
+
+def _generate_code(name: str, taken: set[str]) -> str:
+    for c in _code_candidates(name):
+        if c not in taken:
+            return c
+    raise ValueError(f"Cannot generate a unique code for: {name!r}")
+
+
+@router.post("/hospitals/generate-codes")
+def generate_hospital_codes(
+    request: Request,
+    db: Session = Depends(get_db),
+    _: dict = Depends(_verify_admin_token),
+):
+    """
+    Auto-generate 3-letter codes for every hospital that currently has none.
+    Saves immediately and returns a list of assignments.
+    """
+    all_hospitals = db.query(Hospital).order_by(Hospital.name).all()
+    taken: set[str] = {h.hospital_code.upper() for h in all_hospitals if h.hospital_code}
+    need = [h for h in all_hospitals if not h.hospital_code]
+
+    if not need:
+        return {"assigned": [], "total": 0, "message": "All hospitals already have codes."}
+
+    assigned = []
+    for h in need:
+        code = _generate_code(h.name, taken)
+        taken.add(code)
+        h.hospital_code = code
+        assigned.append({"hospital_id": str(h.id), "name": h.name, "code": code})
+
+    write_audit(
+        db,
+        user_name="Admin",
+        user_role="superadmin",
+        action_type="BULK_CODE_ASSIGN",
+        entity_type="Hospital",
+        entity_id="bulk",
+        details={"count": len(assigned), "codes": {a["name"]: a["code"] for a in assigned}},
+        ip_address=request.client.host if request.client else None,
+    )
+    db.commit()
+    return {"assigned": assigned, "total": len(assigned),
+            "message": f"{len(assigned)} hospital(s) assigned codes."}
 
 
 @router.post("/hospitals", response_model=HospitalOut)

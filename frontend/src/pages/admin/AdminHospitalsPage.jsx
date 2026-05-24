@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   listHospitals, createHospital, updateHospital,
   deactivateHospital, activateHospital, checkHospitalCode,
+  generateHospitalCodes,
 } from '../../services/adminApi'
 
 // ── Code suggestion from hospital name ───────────────────────────────────────
@@ -299,8 +300,14 @@ export default function AdminHospitalsPage() {
   const [formError, setFormError] = useState('')
   const [confirm, setConfirm] = useState(null)      // { hospital }
   const [inactiveOpen, setInactiveOpen] = useState(false)
+  const [genResult, setGenResult] = useState(null)  // result from generate-codes
 
   // ── Mutations ──────────────────────────────────────────────────────────────
+
+  const generateMut = useMutation({
+    mutationFn: generateHospitalCodes,
+    onSuccess: (data) => { qc.invalidateQueries({ queryKey: ['admin-hospitals'] }); setGenResult(data) },
+  })
 
   const createMut = useMutation({
     mutationFn: createHospital,
@@ -469,6 +476,59 @@ export default function AdminHospitalsPage() {
           + Add Hospital
         </button>
       </div>
+
+      {/* Missing-codes banner */}
+      {(() => {
+        const missing = hospitals.filter(h => h.is_active && !h.hospital_code).length
+        if (!missing) return null
+        return (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.75rem',
+            background: '#FFFBEB', border: '1px solid #FCD34D', borderRadius: 8,
+            padding: '.75rem 1rem', marginBottom: '1.25rem',
+          }}>
+            <span style={{ fontSize: '.85rem', color: '#92400E' }}>
+              <strong>{missing}</strong> active hospital{missing > 1 ? 's have' : ' has'} no ROP code. Babies enrolled there will not receive ROP IDs.
+            </span>
+            <button
+              onClick={() => generateMut.mutate()}
+              disabled={generateMut.isPending}
+              style={{
+                padding: '.4rem .9rem', background: '#F59E0B', color: '#fff',
+                border: 'none', borderRadius: 6, fontWeight: 600, fontSize: '.82rem',
+                cursor: generateMut.isPending ? 'not-allowed' : 'pointer', flexShrink: 0,
+              }}
+            >
+              {generateMut.isPending ? 'Generating…' : 'Auto-assign missing codes'}
+            </button>
+          </div>
+        )
+      })()}
+
+      {/* Generate-codes result */}
+      {genResult && (
+        <div style={{
+          background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: 8,
+          padding: '.75rem 1rem', marginBottom: '1.25rem',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: genResult.assigned.length ? '.6rem' : 0 }}>
+            <span style={{ fontSize: '.85rem', color: '#166534', fontWeight: 600 }}>{genResult.message}</span>
+            <button onClick={() => setGenResult(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', fontSize: '.8rem' }}>Dismiss</button>
+          </div>
+          {genResult.assigned.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.35rem' }}>
+              {genResult.assigned.map(a => (
+                <span key={a.hospital_id} style={{
+                  background: '#DCFCE7', border: '1px solid #86EFAC', borderRadius: 4,
+                  padding: '2px 8px', fontSize: '.78rem', color: '#166534',
+                }}>
+                  <strong style={{ fontFamily: 'monospace' }}>{a.code}</strong> — {a.name}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Search */}
       <input

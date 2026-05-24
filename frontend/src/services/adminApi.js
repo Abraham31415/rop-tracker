@@ -70,6 +70,9 @@ export const listHospitals = () =>
 export const checkHospitalCode = (code) =>
   adminApi.get(`/api/sys-mgmt/hospitals/check-code/${encodeURIComponent(code)}`).then(r => r.data)
 
+export const generateHospitalCodes = () =>
+  adminApi.post('/api/sys-mgmt/hospitals/generate-codes').then(r => r.data)
+
 export const createHospital = (data) =>
   adminApi.post('/api/sys-mgmt/hospitals', data).then(r => r.data)
 
