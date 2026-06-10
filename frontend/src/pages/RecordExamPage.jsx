@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getBaby, listExams, recordExam } from '../services/api'
@@ -479,6 +479,14 @@ export default function RecordExamPage() {
   })
   const [examDate, setExamDate]         = useState(today)
   const [postnatalAge, setPostnatalAge] = useState('')
+
+  const calcPostnatalAge = (dob, examDateStr) => {
+    if (!dob) return ''
+    const d1 = new Date(dob + 'T00:00:00')
+    const d2 = new Date(examDateStr + 'T00:00:00')
+    const days = Math.round((d2 - d1) / 86400000)
+    return days >= 0 ? String(days) : ''
+  }
   const [treatment, setTreatment]       = useState('')
   const [notes, setNotes]               = useState('')
   const [submitting, setSubmitting]     = useState(false)
@@ -500,6 +508,12 @@ export default function RecordExamPage() {
     right_others: null, left_others: null,
     right_others_specify: '', left_others_specify: '',
   })
+
+  useEffect(() => {
+    if (baby?.date_of_birth) {
+      setPostnatalAge(calcPostnatalAge(baby.date_of_birth, examDate))
+    }
+  }, [baby?.date_of_birth, examDate])
 
   const handleFieldChange = (key, value) => setFields(prev => ({ ...prev, [key]: value }))
 
@@ -593,7 +607,7 @@ export default function RecordExamPage() {
               <input type="date" value={examDate} max={today} onChange={e => setExamDate(e.target.value)} required />
             </div>
             <div className="form-group">
-              <label>Postnatal Age (days)</label>
+              <label>Postnatal Age (days) <span style={{ fontWeight: 400, color: 'var(--gray-500)', fontSize: '.8em' }}>(auto-calculated)</span></label>
               <input type="number" min="0" value={postnatalAge} onChange={e => setPostnatalAge(e.target.value)} placeholder="e.g. 42" />
             </div>
           </div>

@@ -128,6 +128,16 @@ export default function EnrollBabyPage() {
     }
   }, [hospitals, user, setValue])
 
+  const watchedDob = watch('date_of_birth')
+  useEffect(() => {
+    if (!watchedDob) return
+    const dob = new Date(watchedDob + 'T00:00:00')
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const days = Math.round((today - dob) / 86400000)
+    if (days >= 0) setValue('postnatal_age_days', days)
+  }, [watchedDob, setValue])
+
   const onSubmit = async data => {
     setSubmitError('')
     try {
@@ -257,7 +267,7 @@ export default function EnrollBabyPage() {
               {errors.gestational_age_weeks && <span className="error-msg">{errors.gestational_age_weeks.message}</span>}
             </div>
             <div className="form-group">
-              <label>Postnatal Age at First Exam (days)</label>
+              <label>Postnatal Age at First Exam (days) <span style={{ fontWeight: 400, color: 'var(--gray-500)', fontSize: '.8em' }}>(auto-calculated)</span></label>
               <input type="number" min="0" {...register('postnatal_age_days')} placeholder="e.g. 14" />
             </div>
           </div>
