@@ -97,7 +97,8 @@ export default function EnrollBabyPage() {
   const [submitError, setSubmitError] = useState('')
   const [success, setSuccess] = useState(false)
 
-  const isOphthalm = user?.role === 'ophthalmologist'
+  const isOphthalm   = user?.role === 'ophthalmologist'
+  const isSingleHosp = user?.role === 'nicu_nurse' || user?.role === 'hospital_coordinator'
 
   const { data: hospitals = [], isLoading: hospitalsLoading } = useQuery({
     queryKey: ['hospitals'],
@@ -176,7 +177,17 @@ export default function EnrollBabyPage() {
         <FormSection icon={<IconHospital />} iconColor="teal" title="Hospital / Facility" sub="Select the facility where this baby is being enrolled">
           <div className="form-group">
             <label>Hospital / Facility *</label>
-            {isOphthalm ? (
+            {isSingleHosp ? (
+              <>
+                <input
+                  type="text"
+                  value={hospitalsLoading ? 'Loading…' : (hospitals.find(h => h.id === watch('hospital_id'))?.name ?? 'Your hospital')}
+                  readOnly
+                  style={{ background: 'var(--gray-100)', cursor: 'not-allowed', color: 'var(--gray-600)' }}
+                />
+                <input type="hidden" {...register('hospital_id', { required: 'Hospital is required' })} />
+              </>
+            ) : isOphthalm ? (
               <select
                 {...register('hospital_id', { required: 'Hospital is required' })}
                 disabled={myHospitalsLoading}
