@@ -129,6 +129,8 @@ export default function EnrollBabyPage() {
     }
   }, [hospitals, user, setValue])
 
+  const watchedFullName = watch('full_name')
+
   const watchedDob = watch('date_of_birth')
   useEffect(() => {
     if (!watchedDob) return
@@ -144,6 +146,7 @@ export default function EnrollBabyPage() {
     try {
       const payload = {
         ...data,
+        caregiver_name:        data.full_name,
         birth_weight_grams:    parseFloat(data.birth_weight_grams),
         gestational_age_weeks: parseFloat(data.gestational_age_weeks),
         postnatal_age_days:    data.postnatal_age_days ? parseInt(data.postnatal_age_days) : null,
@@ -230,9 +233,12 @@ export default function EnrollBabyPage() {
         <FormSection icon={<IconUser />} iconColor="teal" title="Baby Information" sub="Identity and basic demographics">
           <div className="form-row">
             <div className="form-group" style={{ gridColumn: 'span 2' }}>
-              <label>Full Name *</label>
-              <input {...register('full_name', { required: 'Name is required' })} placeholder="e.g. Baby Nakamya" />
+              <label>Mother / Caregiver Name *</label>
+              <input {...register('full_name', { required: 'Name is required' })} placeholder="e.g. Nakamya Sarah" />
               {errors.full_name && <span className="error-msg">{errors.full_name.message}</span>}
+              <span style={{ fontSize: '.78rem', color: 'var(--gray-500)', marginTop: '.25rem', display: 'block' }}>
+                Baby will be recorded as B/O {watchedFullName?.trim() || '[name entered]'}
+              </span>
             </div>
             <div className="form-group">
               <label>Date of Birth *</label>
@@ -305,11 +311,6 @@ export default function EnrollBabyPage() {
 
         <FormSection icon={<IconPhone />} iconColor="green" title="Parent / Caregiver" sub="Contact details for SMS & WhatsApp reminders">
           <div className="form-row">
-            <div className="form-group">
-              <label>Caregiver Full Name *</label>
-              <input {...register('caregiver_name', { required: 'Caregiver name is required' })} placeholder="e.g. Prossy Nakamya" />
-              {errors.caregiver_name && <span className="error-msg">{errors.caregiver_name.message}</span>}
-            </div>
             <div className="form-group">
               <label>MTN Phone Number</label>
               <input {...register('mtn_phone')} placeholder="+256 77X XXX XXX" type="tel" />

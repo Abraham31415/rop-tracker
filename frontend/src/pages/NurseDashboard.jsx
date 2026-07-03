@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { getDashboard, updateDilation, createScreeningRequest, getActiveScreeningRequest } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
+import { getBabyDisplayName } from '../utils/babyName'
 
 const DILATION_OPTIONS = [
   { value: 'dilated',          label: 'Dilated and ready for screening' },
@@ -70,7 +71,7 @@ function BabyRow({ baby }) {
         onKeyDown={e => e.key === 'Enter' && navigate(`/babies/${baby.id}`)}
       >
         <div>
-          <div className="baby-card-name">{baby.full_name}</div>
+          <div className="baby-card-name">{getBabyDisplayName(baby)}</div>
           <div className="baby-card-sub">
             {baby.sex === 'male' ? 'Male' : 'Female'}
             &nbsp;·&nbsp; DOB {format(new Date(baby.date_of_birth + 'T00:00:00'), 'dd MMM yyyy')}

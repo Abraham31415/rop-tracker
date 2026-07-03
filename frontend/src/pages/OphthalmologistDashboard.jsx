@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format, formatDistanceToNow } from 'date-fns'
 import { getDashboard, getPendingScreeningRequests, claimScreeningRequest } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
+import { getBabyDisplayName } from '../utils/babyName'
 
 const DILATION_LABELS = {
   dilated:          { label: 'Dilated', color: 'var(--teal-700,#0f766e)' },
@@ -28,7 +29,7 @@ function ScreeningRequestCard({ req }) {
             className="baby-card-name"
             style={{ textDecoration: 'none', color: 'inherit' }}
             onClick={e => e.stopPropagation()}
-          >{req.baby_name}</Link>
+          >{getBabyDisplayName(req.baby_name)}</Link>
           <div className="baby-card-sub">
             Requested by {req.requested_by_name}
             &nbsp;·&nbsp; {formatDistanceToNow(new Date(req.created_at), { addSuffix: true })}
@@ -83,7 +84,7 @@ function PatientCard({ baby }) {
     >
       <div className="baby-card-header">
         <div>
-          <div className="baby-card-name">{baby.full_name}</div>
+          <div className="baby-card-name">{getBabyDisplayName(baby)}</div>
           <div className="baby-card-sub">
             {baby.hospital_name}
             &nbsp;·&nbsp; DOB {format(new Date(baby.date_of_birth + 'T00:00:00'), 'dd MMM yyyy')}

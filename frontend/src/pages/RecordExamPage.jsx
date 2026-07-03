@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { getBaby, listExams, recordExam } from '../services/api'
 import { useTheme } from '../contexts/ThemeContext'
 import { format, addWeeks } from 'date-fns'
+import { getBabyDisplayName } from '../utils/babyName'
 
 // ── ROP scheduling logic ──────────────────────────────────────────────────────
 const ZONE_RANK  = { zone_i: 1, zone_ii: 2, zone_iii: 3 }
@@ -586,7 +587,7 @@ export default function RecordExamPage() {
           <div>
             <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--gray-900)', letterSpacing: '-.02em' }}>Record ROP Exam</h2>
             <p style={{ color: 'var(--gray-500)', fontSize: '.875rem', marginTop: '.15rem' }}>
-              {baby.full_name} · DOB {dob} · GA {baby.gestational_age_weeks}w · {baby.birth_weight_grams}g
+              {getBabyDisplayName(baby)} · DOB {dob} · GA {baby.gestational_age_weeks}w · {baby.birth_weight_grams}g
             </p>
           </div>
         </div>

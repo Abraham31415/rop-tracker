@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { format, differenceInDays } from 'date-fns'
 import NurseDashboard from './NurseDashboard'
 import OphthalmologistDashboard from './OphthalmologistDashboard'
+import { getBabyDisplayName } from '../utils/babyName'
 
 // ── Dummy data (dates computed relative to today so the demo never goes stale) ─
 function _d(offsetDays) {
@@ -89,7 +90,7 @@ function BabyCard({ baby }) {
     >
       <div className="baby-card-header">
         <div>
-          <div className="baby-card-name">{baby.full_name}</div>
+          <div className="baby-card-name">{getBabyDisplayName(baby)}</div>
           {baby.rop_id && (
             <div style={{ fontFamily: 'monospace', fontSize: '.72rem', fontWeight: 700, color: 'var(--teal-600)', marginTop: '.1rem' }}>
               {baby.rop_id}

@@ -184,6 +184,7 @@ def update_baby(
 
     # Caregiver-facing field labels for audit log
     CAREGIVER_FIELDS = {
+        "full_name": "Name",
         "caregiver_name": "Caregiver name",
         "mtn_phone": "MTN number",
         "airtel_phone": "Airtel number",

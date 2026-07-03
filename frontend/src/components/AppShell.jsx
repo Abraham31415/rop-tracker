@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import { getAlertCount, searchBabies } from '../services/api'
+import { getBabyDisplayName } from '../utils/babyName'
 
 
 const ROLE_LABELS = {
@@ -106,7 +107,7 @@ function SearchOverlay({ onClose }) {
               return (
                 <button key={b.id} className="search-overlay-row" onClick={() => go(b.id)}>
                   <div>
-                    <div className="search-overlay-name">{b.full_name}</div>
+                    <div className="search-overlay-name">{getBabyDisplayName(b)}</div>
                     <div className="search-overlay-meta">
                       {b.caregiver_name}{phone ? ` · ${phone}` : ''}{b.hospital_name ? ` · ${b.hospital_name}` : ''}
                     </div>

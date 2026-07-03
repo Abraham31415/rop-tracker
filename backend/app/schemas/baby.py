@@ -38,6 +38,7 @@ class BabyCreate(BaseModel):
 
 
 class BabyUpdate(BaseModel):
+    full_name: Optional[str] = None
     caregiver_name: Optional[str] = None
     mtn_phone: Optional[str] = None
     airtel_phone: Optional[str] = None

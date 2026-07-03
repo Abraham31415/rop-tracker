@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { searchBabies } from '../services/api'
+import { getBabyDisplayName } from '../utils/babyName'
 
 const ZONE_LABELS  = { zone_i: 'Zone I', zone_ii: 'Zone II', zone_iii: 'Zone III' }
 const STAGE_LABELS = { no_rop: 'No ROP', stage_1: 'Stage 1', stage_2: 'Stage 2', stage_3: 'Stage 3', immature: 'Immature' }
@@ -70,7 +71,7 @@ export default function SearchPage() {
             return (
               <div key={b.id} className="search-result-row">
                 <div className="search-result-main">
-                  <div className="search-result-name">{b.full_name}</div>
+                  <div className="search-result-name">{getBabyDisplayName(b)}</div>
                   <div className="search-result-meta">
                     <span>{b.caregiver_name}</span>
                     {phone && <span>· {phone}</span>}

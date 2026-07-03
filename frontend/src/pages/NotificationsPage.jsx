@@ -5,6 +5,7 @@ import { formatDistanceToNow, format } from 'date-fns'
 import { getNotifications, dismissAlert, getPendingScreeningRequests, claimScreeningRequest } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { getBabyDisplayName, boifyFirstMention } from '../utils/babyName'
 
 const TYPE_META = {
   ltfu:      { label: 'LTFU',        cls: 'notif-ltfu',     icon: '!' },
@@ -30,8 +31,8 @@ function NotifCard({ item, onDismiss }) {
             </span>
           )}
         </div>
-        <div className="notif-title">{item.title}</div>
-        <div className="notif-body">{item.body}</div>
+        <div className="notif-title">{boifyFirstMention(item.title, item.baby_name)}</div>
+        <div className="notif-body">{boifyFirstMention(item.body, item.baby_name)}</div>
         <div className="notif-actions">
           {item.baby_id && (
             <Link to={`/babies/${item.baby_id}`} className="btn btn-secondary btn-sm">
@@ -81,7 +82,7 @@ function ScreeningRequestsPanel() {
               </span>
               <span className="notif-time">{formatDistanceToNow(new Date(req.created_at), { addSuffix: true })}</span>
             </div>
-            <div className="notif-title">{req.baby_name}</div>
+            <div className="notif-title">{getBabyDisplayName(req.baby_name)}</div>
             <div className="notif-body">
               Requested by {req.requested_by_name}
               {req.notes && ` - ${req.notes}`}

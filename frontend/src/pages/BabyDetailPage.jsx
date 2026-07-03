@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { format, formatDistanceToNow } from 'date-fns'
 import { generateBabyFullPDF, generateSingleVisitPDF } from '../services/pdfExport'
+import { getBabyDisplayName } from '../utils/babyName'
 
 // ── SMS error → human-readable message ───────────────────────────────────────
 function mapSmsError(raw) {
@@ -793,7 +794,7 @@ function CaregiverCard({ baby, canEdit }) {
 
   const startEdit = () => {
     setForm({
-      caregiver_name: baby.caregiver_name || '',
+      caregiver_name: baby.full_name || baby.caregiver_name || '',
       mtn_phone:      baby.mtn_phone      || '',
       airtel_phone:   baby.airtel_phone   || '',
       language_preference: baby.language_preference || 'english',
@@ -812,7 +813,7 @@ function CaregiverCard({ baby, canEdit }) {
   })
 
   const handleSave = () => {
-    const payload = { ...form }
+    const payload = { ...form, full_name: form.caregiver_name }
     if (!payload.mtn_phone)    payload.mtn_phone    = null
     if (!payload.airtel_phone) payload.airtel_phone = null
     if (!payload.notes)        payload.notes        = null
@@ -828,8 +829,8 @@ function CaregiverCard({ baby, canEdit }) {
         <SectionHeading>Caregiver &amp; Contact</SectionHeading>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '.7rem' }}>
           <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label">Caregiver Name</label>
-            <input type="text" className="form-control" placeholder="Full name" {...f('caregiver_name')} />
+            <label className="form-label">Mother / Caregiver Name</label>
+            <input type="text" className="form-control" placeholder="e.g. Nakamya Sarah" {...f('caregiver_name')} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.6rem' }}>
             <div className="form-group" style={{ margin: 0 }}>
@@ -883,7 +884,7 @@ function CaregiverCard({ baby, canEdit }) {
           </button>
         )}
       </div>
-      <InfoRow label="Name"     value={baby.caregiver_name} />
+      <InfoRow label="Mother / Caregiver Name" value={baby.full_name || baby.caregiver_name} />
       <InfoRow label="MTN"      value={baby.mtn_phone} />
       <InfoRow label="Airtel"   value={baby.airtel_phone} />
       <InfoRow label="Language" value={LANG_MAP[baby.language_preference] || baby.language_preference} />
@@ -1366,7 +1367,7 @@ export default function BabyDetailPage() {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap' }}>
               <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--gray-900)', letterSpacing: '-.02em' }}>
-                {baby.full_name}
+                {getBabyDisplayName(baby)}
               </h2>
               <span style={{ padding: '.2rem .65rem', borderRadius: 999, fontSize: '.75rem', fontWeight: 700, background: st.bg, color: st.color }}>
                 {st.label}
@@ -1440,7 +1441,7 @@ export default function BabyDetailPage() {
       {showDischargeModal && (
         <DischargeModal
           babyId={id}
-          babyName={baby.full_name}
+          babyName={getBabyDisplayName(baby)}
           onClose={() => setShowDischargeModal(false)}
           onDischarged={() => {
             setShowDischargeModal(false)

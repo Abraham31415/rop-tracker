@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { getDashboard, listHospitals } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
+import { getBabyDisplayName } from '../utils/babyName'
 
 const ZONE_LABELS  = { zone_i: 'Zone I', zone_ii: 'Zone II', zone_iii: 'Zone III' }
 const STAGE_LABELS = { no_rop: 'No ROP', stage_1: 'St.1', stage_2: 'St.2', stage_3: 'St.3', immature: 'Immature' }
@@ -157,7 +158,7 @@ export default function AllBabiesPage() {
                 return (
                   <tr key={b.id}>
                     <td>
-                      <div className="table-baby-name">{b.full_name}</div>
+                      <div className="table-baby-name">{getBabyDisplayName(b)}</div>
                       <div className="table-baby-sub">
                         {b.sex === 'male' ? 'M' : 'F'} · DOB {b.date_of_birth ? format(new Date(b.date_of_birth + 'T00:00:00'), 'dd MMM yy') : '-'}
                       </div>

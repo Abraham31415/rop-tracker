@@ -5,6 +5,7 @@ import { format, differenceInCalendarDays, addDays } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import { listAllAppointments, markAppointmentAttended, rescheduleAppointment } from '../services/api'
 import { useTheme } from '../contexts/ThemeContext'
+import { getBabyDisplayName } from '../utils/babyName'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const STATUS_META_LIGHT = {
@@ -60,7 +61,7 @@ function AttendDialog({ appt, onConfirm, onCancel, isPending }) {
           Confirm Attendance
         </div>
         <p style={{ fontSize: '.9rem', color: 'var(--gray-700)', marginBottom: '1rem', lineHeight: 1.5 }}>
-          Confirm attendance for <strong>{appt.baby_name}</strong> on{' '}
+          Confirm attendance for <strong>{getBabyDisplayName(appt.baby_name)}</strong> on{' '}
           <strong>{format(new Date(appt.due_date + 'T00:00:00'), 'dd MMMM yyyy')}</strong>?
         </p>
         <div className="form-group" style={{ marginBottom: '1rem' }}>
@@ -136,7 +137,7 @@ function ApptCard({ appt, canAct, isCentral, onAttend, onRescheduleSuccess, quer
             to={`/babies/${appt.baby_id}`}
             style={{ fontWeight: 800, fontSize: '.95rem', color: 'var(--gray-900)', textDecoration: 'none' }}
           >
-            {appt.baby_name}
+            {getBabyDisplayName(appt.baby_name)}
           </Link>
           {isCentral && appt.hospital_name && (
             <div style={{ fontSize: '.73rem', color: 'var(--gray-400)', marginTop: '.1rem' }}>
