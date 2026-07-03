@@ -8,6 +8,12 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import QRCode from 'qrcode'
+import { getBabyDisplayName, getBabyFileNameSlug } from '../utils/babyName'
+import {
+  getRopFindingsDistribution, getTreatmentAnalytics, getLtfuDeepDive,
+  getAdherence, getProgrammePerformance, getPatientProfile,
+  getVisualOutcomes, getReminderPerformance, getHospitalComparison,
+} from './api'
 
 // ── Palette ──────────────────────────────────────────────────────────────────
 const C = {
@@ -630,7 +636,7 @@ export async function generateSingleVisitPDF(baby, exam, hospitalName) {
 
   const bdRows = [
     ...(baby.rop_id ? [['ROP Tracker ID', baby.rop_id, 'Hospital', hospitalName || '-']] : []),
-    ['Full Name',    baby.full_name,                          'Date of Birth',   fmtDate(baby.date_of_birth)],
+    ['Full Name',    getBabyDisplayName(baby),                'Date of Birth',   fmtDate(baby.date_of_birth)],
     ['Sex',          baby.sex === 'male' ? 'Male' : 'Female', 'Gestational Age', `${baby.gestational_age_weeks} weeks`],
     ['Birth Weight', `${baby.birth_weight_grams}g`,           'Caregiver',       baby.caregiver_name],
     ['MTN Phone',    baby.mtn_phone || '-',                   'Airtel Phone',    baby.airtel_phone || '-'],
@@ -750,7 +756,7 @@ export async function generateSingleVisitPDF(baby, exam, hospitalName) {
   }
 
   bwFooter(doc, 1, 1)
-  doc.save(`ROP-Visit-${baby.full_name.replace(/\s+/g, '-')}-${exam.exam_date}.pdf`)
+  doc.save(`ROP-Visit-${getBabyFileNameSlug(baby)}-${exam.exam_date}.pdf`)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -802,7 +808,7 @@ export async function generateBabyFullPDF(baby, exams, hospitalName) {
   setTxt(doc, BW.black)
   doc.setFont('times', 'bold')
   doc.setFontSize(12)
-  doc.text(baby.full_name, ML, y)
+  doc.text(getBabyDisplayName(baby), ML, y)
 
   const statusText = STATUS_LABELS_BW[baby.status] || '[ACTIVE]'
   doc.text(statusText, PW - MR, y, { align: 'right' })
@@ -930,7 +936,7 @@ export async function generateBabyFullPDF(baby, exams, hospitalName) {
     setTxt(doc, BW.black)
     doc.setFont('times', 'bold')
     doc.setFontSize(12)
-    doc.text(`${baby.full_name}  |  Complete Clinical Record`, ML, 11)
+    doc.text(`${getBabyDisplayName(baby)}  |  Complete Clinical Record`, ML, 11)
     doc.setFont('times', 'normal')
     doc.text(`Exam ${ei + 1} of ${sortedExams.length}`, PW - MR, 11, { align: 'right' })
     setDraw(doc, BW.black)
@@ -1019,5 +1025,200 @@ export async function generateBabyFullPDF(baby, exams, hospitalName) {
     bwFooter(doc, ei + 2, totalPages)
   }
 
-  doc.save(`ROP-Record-${baby.full_name.replace(/\s+/g, '-')}-${Date.now()}.pdf`)
+  doc.save(`ROP-Record-${getBabyFileNameSlug(baby)}-${Date.now()}.pdf`)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TYPE 3 — Analytics Dashboard Report (numbers & tables, no chart images)
+// ─────────────────────────────────────────────────────────────────────────────
+export async function generateAnalyticsDashboardPDF({ periodLabel, hospitalName, params, kpis }) {
+  const [
+    findings, treatment, ltfu, adherence, programme,
+    patientProfile, outcomes, reminders, hospitalComparison,
+  ] = await Promise.all([
+    getRopFindingsDistribution(params), getTreatmentAnalytics(params), getLtfuDeepDive(params),
+    getAdherence(params), getProgrammePerformance(params), getPatientProfile(params),
+    getVisualOutcomes(params), getReminderPerformance(params), getHospitalComparison(params),
+  ])
+
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+
+  // ── Cover ────────────────────────────────────────────────────────────────
+  setFill(doc, C.teal)
+  doc.rect(0, 0, PW, 55, 'F')
+  setTxt(doc, C.white)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(22)
+  doc.text('ROP Tracker Uganda', PW / 2, 24, { align: 'center' })
+  doc.setFontSize(12)
+  doc.setFont('helvetica', 'normal')
+  doc.text('Analytics Dashboard Report', PW / 2, 33, { align: 'center' })
+  doc.setFontSize(9)
+  doc.text(`${hospitalName}  ·  Period: ${periodLabel}  ·  Generated ${fmtNow()}`, PW / 2, 41, { align: 'center' })
+
+  let y = 65
+  y = sectionHeading(doc, y, 'Summary KPIs')
+  autoTable(doc, {
+    startY: y,
+    margin: { left: ML, right: MR },
+    body: [
+      ['Babies Screened', kpis.totalScreened ?? '-', 'Avg LTFU Rate', kpis.avgLtfuRate != null ? `${kpis.avgLtfuRate}%` : '-'],
+      ['At-Risk Now', kpis.currentAtRisk ?? '-', 'Exams Recorded', kpis.totalExams ?? '-'],
+      ['Treatment Rate', kpis.treatmentRate != null ? `${kpis.treatmentRate}%` : '-', 'Screening Coverage', kpis.screeningCoverage != null ? `${kpis.screeningCoverage}%` : '-'],
+      ['Avg Days to First Exam', kpis.avgDaysToFirstExam != null ? `${kpis.avgDaysToFirstExam}d` : '-', '', ''],
+    ],
+    styles: { fontSize: 9, cellPadding: 3 },
+    columnStyles: {
+      0: { fontStyle: 'bold', textColor: C.gray500, cellWidth: 45 },
+      2: { fontStyle: 'bold', textColor: C.gray500, cellWidth: 45 },
+    },
+  })
+  y = doc.lastAutoTable.finalY + 8
+
+  // ── ROP findings distribution ──
+  y = sectionHeading(doc, y, 'ROP Findings Distribution')
+  autoTable(doc, {
+    startY: y,
+    margin: { left: ML, right: MR },
+    head: [['Finding', 'Babies', '% of Total']],
+    body: (findings.overall || []).map(f => [STAGE_LABELS[f.stage] || f.stage, f.count, `${f.pct}%`]),
+    styles: { fontSize: 9, cellPadding: 3 },
+    headStyles: { fillColor: C.teal, textColor: C.white, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: C.gray100 },
+    columnStyles: { 1: { halign: 'center' }, 2: { halign: 'center' } },
+  })
+  y = doc.lastAutoTable.finalY + 8
+
+  // ── Treatment ──
+  if (y > 230) { doc.addPage(); addPageHeader(doc, hospitalName, periodLabel); y = 20 }
+  y = sectionHeading(doc, y, 'Treatment')
+  autoTable(doc, {
+    startY: y,
+    margin: { left: ML, right: MR },
+    head: [['Treatment Type', 'Babies']],
+    body: (treatment.types || []).map(t => [t.label, t.count]),
+    foot: [['Flagged, not yet treated (Stage 2+)', treatment.flagged_untreated_count ?? 0]],
+    styles: { fontSize: 9, cellPadding: 3 },
+    headStyles: { fillColor: C.teal, textColor: C.white, fontStyle: 'bold' },
+    footStyles: { fillColor: C.red, textColor: C.white, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: C.gray100 },
+    columnStyles: { 1: { halign: 'center' } },
+  })
+  y = doc.lastAutoTable.finalY + 8
+
+  // ── LTFU ──
+  if (y > 220) { doc.addPage(); addPageHeader(doc, hospitalName, periodLabel); y = 20 }
+  y = sectionHeading(doc, y, 'LTFU Analysis')
+  autoTable(doc, {
+    startY: y,
+    margin: { left: ML, right: MR },
+    body: [
+      ['Total LTFU Episodes', ltfu.total_episodes ?? '-', 'Recovery Rate', ltfu.recovery_rate != null ? `${ltfu.recovery_rate}%` : '-'],
+      ['Median Days Overdue', ltfu.median_days_overdue != null ? `${ltfu.median_days_overdue}d` : '-', '', ''],
+    ],
+    styles: { fontSize: 9, cellPadding: 3 },
+    columnStyles: { 0: { fontStyle: 'bold', textColor: C.gray500, cellWidth: 45 }, 2: { fontStyle: 'bold', textColor: C.gray500, cellWidth: 45 } },
+  })
+  y = doc.lastAutoTable.finalY + 4
+  if ((ltfu.by_hospital || []).length > 0) {
+    autoTable(doc, {
+      startY: y,
+      margin: { left: ML, right: MR },
+      head: [['Hospital', 'LTFU Count', 'LTFU Rate']],
+      body: ltfu.by_hospital.map(h => [h.hospital_name, h.ltfu_count, `${h.rate}%`]),
+      styles: { fontSize: 8.5, cellPadding: 2.5 },
+      headStyles: { fillColor: C.teal, textColor: C.white, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: C.gray100 },
+      columnStyles: { 1: { halign: 'center' }, 2: { halign: 'center' } },
+    })
+    y = doc.lastAutoTable.finalY + 8
+  }
+
+  // ── Adherence & programme performance ──
+  if (y > 220) { doc.addPage(); addPageHeader(doc, hospitalName, periodLabel); y = 20 }
+  y = sectionHeading(doc, y, 'Appointment Adherence & Programme Performance')
+  autoTable(doc, {
+    startY: y,
+    margin: { left: ML, right: MR },
+    body: [
+      ['Avg Reminders Before Attendance', adherence.avg_reminders_before_attendance ?? '-', 'Exam Frequency Compliance', programme.exam_frequency_compliance_pct != null ? `${programme.exam_frequency_compliance_pct}%` : '-'],
+      ['Bilateral Exam Completeness', programme.bilateral_completeness_pct != null ? `${programme.bilateral_completeness_pct}%` : '-', 'Time to Treatment (within 7d)', programme.time_to_treatment?.pct_within_7_days != null ? `${programme.time_to_treatment.pct_within_7_days}%` : '-'],
+    ],
+    styles: { fontSize: 9, cellPadding: 3 },
+    columnStyles: { 0: { fontStyle: 'bold', textColor: C.gray500, cellWidth: 55 }, 2: { fontStyle: 'bold', textColor: C.gray500, cellWidth: 55 } },
+  })
+  y = doc.lastAutoTable.finalY + 8
+
+  // ── Patient profile: risk factors ──
+  if (y > 210) { doc.addPage(); addPageHeader(doc, hospitalName, periodLabel); y = 20 }
+  y = sectionHeading(doc, y, 'Risk Factor Frequency')
+  autoTable(doc, {
+    startY: y,
+    margin: { left: ML, right: MR },
+    head: [['Risk Factor', 'Babies']],
+    body: (patientProfile.risk_factor_frequency || []).map(r => [r.label, r.count]),
+    styles: { fontSize: 8.5, cellPadding: 2.5 },
+    headStyles: { fillColor: C.teal, textColor: C.white, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: C.gray100 },
+    columnStyles: { 1: { halign: 'center' } },
+  })
+  y = doc.lastAutoTable.finalY + 8
+
+  // ── Visual outcomes (only if recorded) ──
+  if (outcomes.has_data) {
+    if (y > 210) { doc.addPage(); addPageHeader(doc, hospitalName, periodLabel); y = 20 }
+    y = sectionHeading(doc, y, 'Visual Outcomes')
+    autoTable(doc, {
+      startY: y,
+      margin: { left: ML, right: MR },
+      head: [['Outcome', 'Babies']],
+      body: (outcomes.distribution || []).map(o => [o.label, o.count]),
+      foot: [['Blindness potentially prevented (treated before Stage 4/5)', outcomes.blindness_prevention_count ?? 0]],
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: C.teal, textColor: C.white, fontStyle: 'bold' },
+      footStyles: { fillColor: C.green, textColor: C.white, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: C.gray100 },
+      columnStyles: { 1: { halign: 'center' } },
+    })
+    y = doc.lastAutoTable.finalY + 8
+  }
+
+  // ── Reminder system ──
+  if (y > 220) { doc.addPage(); addPageHeader(doc, hospitalName, periodLabel); y = 20 }
+  y = sectionHeading(doc, y, 'Reminder System')
+  autoTable(doc, {
+    startY: y,
+    margin: { left: ML, right: MR },
+    body: [
+      ['Total SMS Sent', reminders.total_sent ?? '-', 'Delivery Rate', reminders.delivery_rate != null ? `${reminders.delivery_rate}%` : '-'],
+      ['Failure Rate', reminders.failure_rate != null ? `${reminders.failure_rate}%` : '-', '', ''],
+    ],
+    styles: { fontSize: 9, cellPadding: 3 },
+    columnStyles: { 0: { fontStyle: 'bold', textColor: C.gray500, cellWidth: 45 }, 2: { fontStyle: 'bold', textColor: C.gray500, cellWidth: 45 } },
+  })
+  y = doc.lastAutoTable.finalY + 8
+
+  // ── Hospital network comparison ──
+  doc.addPage(); addPageHeader(doc, hospitalName, periodLabel); y = 20
+  y = sectionHeading(doc, y, 'Hospital Network Comparison')
+  autoTable(doc, {
+    startY: y,
+    margin: { left: ML, right: MR },
+    head: [['Hospital', 'Enrolled', 'Exams', 'LTFU Rate', 'Treatment Rate', 'Avg Days to 1st Exam', 'SMS Delivery']],
+    body: (hospitalComparison.hospitals || [])
+      .filter(h => h.enrolled > 0)
+      .map(h => [h.name, h.enrolled, h.exams, `${h.ltfu_rate}%`, `${h.treatment_rate}%`, h.avg_days_to_first_exam != null ? `${h.avg_days_to_first_exam}d` : '-', `${h.sms_delivery_rate}%`]),
+    styles: { fontSize: 8, cellPadding: 2.5 },
+    headStyles: { fillColor: C.teal, textColor: C.white, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: C.gray100 },
+    columnStyles: { 1: { halign: 'center' }, 2: { halign: 'center' }, 3: { halign: 'center' }, 4: { halign: 'center' }, 5: { halign: 'center' }, 6: { halign: 'center' } },
+  })
+
+  const totalPages = doc.getNumberOfPages()
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p)
+    addFooter(doc, p, totalPages)
+  }
+
+  doc.save(`ROP-Analytics-Report-${Date.now()}.pdf`)
 }

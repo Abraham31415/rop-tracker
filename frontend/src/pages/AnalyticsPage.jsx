@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { subDays, format } from 'date-fns'
+import { getBabyDisplayName } from '../utils/babyName'
 import {
   ResponsiveContainer,
   BarChart, Bar,
@@ -15,7 +16,20 @@ import {
   getAtRiskTrend,
   getAtRiskBabies,
   getLtfuBabies,
+  getKpiExtra,
+  listHospitals,
 } from '../services/api'
+import { ChartTooltip, StatCard, ChartCard, BabyModal, STAGE_LABELS, ZONE_LABELS } from './analytics/shared'
+import { generateAnalyticsDashboardPDF } from '../services/pdfExport'
+import DiseaseBurdenSection from './analytics/DiseaseBurdenSection'
+import TreatmentSection from './analytics/TreatmentSection'
+import LtfuDeepDiveSection from './analytics/LtfuDeepDiveSection'
+import AdherenceSection from './analytics/AdherenceSection'
+import ProgrammePerformanceSection from './analytics/ProgrammePerformanceSection'
+import PatientProfileSection from './analytics/PatientProfileSection'
+import VisualOutcomesSection from './analytics/VisualOutcomesSection'
+import ReminderPerformanceSection from './analytics/ReminderPerformanceSection'
+import HospitalComparisonSection from './analytics/HospitalComparisonSection'
 
 // ── Timeframe presets ─────────────────────────────────────────────────────────
 const today = () => format(new Date(), 'yyyy-MM-dd')
@@ -30,145 +44,9 @@ const TIMEFRAMES = [
   { key: 'all', label: 'All',  from: () => null,          group_by: 'month' },
 ]
 
-// ── Shared custom tooltip ─────────────────────────────────────────────────────
-function ChartTooltip({ active, payload, label, valueLabel }) {
-  if (!active || !payload?.length) return null
-  return (
-    <div style={{
-      background: 'var(--surface)', border: '1px solid var(--gray-200)',
-      borderRadius: 'var(--radius)', padding: '.5rem .75rem',
-      fontSize: '.82rem', boxShadow: 'var(--shadow-sm)',
-    }}>
-      <div style={{ color: 'var(--gray-500)', marginBottom: 2 }}>{label}</div>
-      <div style={{ fontWeight: 700, color: 'var(--gray-900)' }}>
-        {payload[0].value}{valueLabel}
-      </div>
-    </div>
-  )
-}
-
-// ── Stat card ─────────────────────────────────────────────────────────────────
-function StatCard({ value, label, sub, color, icon, onClick }) {
-  return (
-    <div
-      className="card"
-      onClick={onClick}
-      style={{ cursor: onClick ? 'pointer' : 'default', display: 'flex', flexDirection: 'column', gap: '.3rem' }}
-    >
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-        <div style={{
-          width: 38, height: 38, borderRadius: 'var(--radius)',
-          background: color + '18',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color, fontSize: '1.1rem', flexShrink: 0,
-        }}>{icon}</div>
-        {onClick && (
-          <span style={{ fontSize: '.72rem', color: 'var(--gray-400)', marginTop: 4 }}>View list →</span>
-        )}
-      </div>
-      <div style={{ fontSize: '2rem', fontWeight: 800, letterSpacing: '-.04em', color: 'var(--gray-900)', lineHeight: 1, marginTop: '.4rem' }}>
-        {value ?? '—'}
-      </div>
-      <div style={{ fontSize: '.8rem', fontWeight: 700, color: 'var(--gray-600)', textTransform: 'uppercase', letterSpacing: '.05em' }}>
-        {label}
-      </div>
-      {sub && <div style={{ fontSize: '.75rem', color: 'var(--gray-400)', marginTop: '.1rem' }}>{sub}</div>}
-    </div>
-  )
-}
-
-// ── Chart card wrapper ────────────────────────────────────────────────────────
-function ChartCard({ title, sub, children, loading }) {
-  return (
-    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <div>
-        <div style={{ fontWeight: 700, fontSize: '.95rem', color: 'var(--gray-900)' }}>{title}</div>
-        {sub && <div style={{ fontSize: '.78rem', color: 'var(--gray-400)', marginTop: 2 }}>{sub}</div>}
-      </div>
-      {loading ? (
-        <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="spinner" />
-        </div>
-      ) : children}
-    </div>
-  )
-}
-
-// ── Baby detail modal ─────────────────────────────────────────────────────────
-function BabyModal({ title, babies, loading, columns, onClose }) {
-  return (
-    <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
-      onClick={onClose}
-    >
-      <div
-        style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 720, maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: 'var(--shadow-lg)' }}
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.1rem 1.25rem', borderBottom: '1px solid var(--gray-100)' }}>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--gray-900)' }}>{title}</div>
-            {!loading && <div style={{ fontSize: '.78rem', color: 'var(--gray-400)', marginTop: 2 }}>{babies?.length ?? 0} babies</div>}
-          </div>
-          <button
-            onClick={onClose}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gray-400)', fontSize: '1.25rem', lineHeight: 1, padding: '4px 8px' }}
-          >
-            ×
-          </button>
-        </div>
-
-        {/* Body */}
-        <div style={{ overflowY: 'auto', flex: 1 }}>
-          {loading ? (
-            <div style={{ padding: '2rem', display: 'flex', justifyContent: 'center' }}>
-              <div className="spinner" />
-            </div>
-          ) : !babies?.length ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--gray-400)', fontSize: '.88rem' }}>
-              No babies found for this period.
-            </div>
-          ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.82rem' }}>
-              <thead>
-                <tr style={{ background: 'var(--gray-50)' }}>
-                  {columns.map(c => (
-                    <th key={c.key} style={{ padding: '.6rem .9rem', textAlign: 'left', fontWeight: 600, color: 'var(--gray-500)', fontSize: '.75rem', textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' }}>
-                      {c.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {babies.map((b, i) => (
-                  <tr key={b.id} style={{ borderTop: '1px solid var(--gray-100)', background: i % 2 ? 'var(--gray-50)' : 'var(--surface)' }}>
-                    {columns.map(c => (
-                      <td key={c.key} style={{ padding: '.65rem .9rem', color: 'var(--gray-800)', whiteSpace: c.wrap ? 'normal' : 'nowrap' }}>
-                        {c.render ? c.render(b) : (b[c.key] ?? '—')}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── Column definitions ────────────────────────────────────────────────────────
-const STAGE_LABELS = {
-  no_rop: 'No ROP', immature: 'Immature',
-  stage_1: 'Stage 1', stage_2: 'Stage 2', stage_3: 'Stage 3',
-  stage_4: 'Stage 4', stage_5: 'Stage 5',
-}
-const ZONE_LABELS  = { zone_i: 'Zone I', zone_ii: 'Zone II', zone_iii: 'Zone III' }
-
 const AT_RISK_COLS = [
-  { key: 'full_name',           label: 'Baby',              render: b => <Link to={`/babies/${b.id}`} style={{ color: 'var(--teal-600)', fontWeight: 600 }}>{b.full_name}</Link> },
+  { key: 'full_name',           label: 'Baby',              render: b => <Link to={`/babies/${b.id}`} style={{ color: 'var(--teal-600)', fontWeight: 600 }}>{getBabyDisplayName(b)}</Link> },
   { key: 'hospital_name',       label: 'Hospital' },
   { key: 'zone',                label: 'Zone',              render: b => ZONE_LABELS[b.zone]  ?? b.zone  ?? '—' },
   { key: 'stage',               label: 'Stage',             render: b => STAGE_LABELS[b.stage] ?? b.stage ?? '—' },
@@ -178,7 +56,7 @@ const AT_RISK_COLS = [
 ]
 
 const LTFU_COLS = [
-  { key: 'full_name',           label: 'Baby',              render: b => <Link to={`/babies/${b.id}`} style={{ color: 'var(--teal-600)', fontWeight: 600 }}>{b.full_name}</Link> },
+  { key: 'full_name',           label: 'Baby',              render: b => <Link to={`/babies/${b.id}`} style={{ color: 'var(--teal-600)', fontWeight: 600 }}>{getBabyDisplayName(b)}</Link> },
   { key: 'hospital_name',       label: 'Hospital' },
   { key: 'zone',                label: 'Zone',              render: b => ZONE_LABELS[b.zone]  ?? b.zone  ?? '—' },
   { key: 'stage',               label: 'Stage',             render: b => STAGE_LABELS[b.stage] ?? b.stage ?? '—' },
@@ -192,29 +70,36 @@ export default function AnalyticsPage() {
   const [tfKey, setTfKey]   = useState('6m')
   const [modal, setModal]   = useState(null)  // null | 'ltfu' | 'at-risk'
   const [ltfuPeriod, setLtfuPeriod] = useState(null)  // { from, to } for LTFU drill-down
+  const [hospitalId, setHospitalId] = useState(null)  // set by clicking a row in Hospital Comparison
+  const [exporting, setExporting] = useState(false)
 
   const tf = TIMEFRAMES.find(t => t.key === tfKey)
   const fromDate  = tf.from()
   const toDate    = today()
   const group_by  = tf.group_by
-  const params    = { group_by, ...(fromDate ? { from_date: fromDate, to_date: toDate } : {}) }
+  const params    = { group_by, ...(fromDate ? { from_date: fromDate, to_date: toDate } : {}), ...(hospitalId ? { hospital_id: hospitalId } : {}) }
+  const scopeParams = { ...(fromDate ? { from_date: fromDate, to_date: toDate } : {}), ...(hospitalId ? { hospital_id: hospitalId } : {}) }
+
+  const { data: hospitals = [] } = useQuery({ queryKey: ['hospitals'], queryFn: listHospitals })
+  const hospitalName = hospitalId ? (hospitals.find(h => h.id === hospitalId)?.name ?? '…') : null
 
   // ── Queries ────────────────────────────────────────────────────────────────
-  const { data: volData,   isLoading: volLoading  } = useQuery({ queryKey: ['analytics-volume',   tfKey], queryFn: () => getScreeningVolume(params) })
-  const { data: ltfuData,  isLoading: ltfuLoading } = useQuery({ queryKey: ['analytics-ltfu',     tfKey], queryFn: () => getLtfuRate(params) })
-  const { data: riskData,  isLoading: riskLoading } = useQuery({ queryKey: ['analytics-at-risk',  tfKey], queryFn: () => getAtRiskTrend(params) })
+  const { data: volData,   isLoading: volLoading  } = useQuery({ queryKey: ['analytics-volume',   tfKey, hospitalId], queryFn: () => getScreeningVolume(params) })
+  const { data: ltfuData,  isLoading: ltfuLoading } = useQuery({ queryKey: ['analytics-ltfu',     tfKey, hospitalId], queryFn: () => getLtfuRate(params) })
+  const { data: riskData,  isLoading: riskLoading } = useQuery({ queryKey: ['analytics-at-risk',  tfKey, hospitalId], queryFn: () => getAtRiskTrend(params) })
+  const { data: kpiExtra,  isLoading: kpiLoading }  = useQuery({ queryKey: ['analytics-kpi-extra', tfKey, hospitalId], queryFn: () => getKpiExtra(scopeParams) })
 
   const ltfuQueryParams = ltfuPeriod
-    ? { from_date: ltfuPeriod.from, to_date: ltfuPeriod.to }
-    : (fromDate ? { from_date: fromDate, to_date: toDate } : {})
+    ? { from_date: ltfuPeriod.from, to_date: ltfuPeriod.to, ...(hospitalId ? { hospital_id: hospitalId } : {}) }
+    : scopeParams
 
   const { data: atRiskBabiesData, isLoading: arLoading } = useQuery({
-    queryKey: ['analytics-at-risk-babies'],
-    queryFn:  getAtRiskBabies,
+    queryKey: ['analytics-at-risk-babies', hospitalId],
+    queryFn:  () => getAtRiskBabies(hospitalId ? { hospital_id: hospitalId } : {}),
     enabled:  modal === 'at-risk',
   })
   const { data: ltfuBabiesData, isLoading: lbLoading } = useQuery({
-    queryKey: ['analytics-ltfu-babies', ltfuPeriod, tfKey],
+    queryKey: ['analytics-ltfu-babies', ltfuPeriod, tfKey, hospitalId],
     queryFn:  () => getLtfuBabies(ltfuQueryParams),
     enabled:  modal === 'ltfu',
   })
@@ -271,18 +156,43 @@ export default function AnalyticsPage() {
     ? ltfuPeriod ? `LTFU Babies (${ltfuPeriod.from} to ${ltfuPeriod.to})` : 'LTFU Babies'
     : 'At-Risk Babies (Treatment Recommended)'
 
+  const handleExportPdf = async () => {
+    setExporting(true)
+    try {
+      await generateAnalyticsDashboardPDF({
+        periodLabel: tf.label,
+        hospitalName: hospitalName || 'All Hospitals (Network-wide)',
+        params: scopeParams,
+        kpis: {
+          totalScreened, avgLtfuRate, currentAtRisk,
+          totalExams: kpiExtra?.total_exams,
+          treatmentRate: kpiExtra?.treatment_rate,
+          screeningCoverage: kpiExtra?.screening_coverage,
+          avgDaysToFirstExam: kpiExtra?.avg_days_to_first_exam,
+        },
+      })
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto' }}>
       {/* Header */}
-      <div style={{ marginBottom: '1.5rem' }}>
-        <h1 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--gray-900)', margin: 0 }}>Analytics</h1>
-        <p style={{ fontSize: '.85rem', color: 'var(--gray-400)', margin: '.25rem 0 0' }}>
-          Network-wide trends for the selected period
-        </p>
+      <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.75rem' }}>
+        <div>
+          <h1 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--gray-900)', margin: 0 }}>Analytics</h1>
+          <p style={{ fontSize: '.85rem', color: 'var(--gray-400)', margin: '.25rem 0 0' }}>
+            Network-wide trends for the selected period
+          </p>
+        </div>
+        <button className="btn btn-secondary btn-sm" onClick={handleExportPdf} disabled={exporting}>
+          {exporting ? 'Exporting…' : '⬇ Export PDF Report'}
+        </button>
       </div>
 
-      {/* Timeframe selector */}
-      <div style={{ display: 'flex', gap: '.4rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+      {/* Timeframe selector + hospital filter chip */}
+      <div style={{ display: 'flex', gap: '.4rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
         {TIMEFRAMES.map(t => (
           <button
             key={t.key}
@@ -300,10 +210,26 @@ export default function AnalyticsPage() {
             {t.label}
           </button>
         ))}
+        {hospitalId && (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: '.4rem',
+            padding: '.3rem .7rem', borderRadius: 999,
+            background: 'var(--teal-50)', color: 'var(--teal-700)',
+            fontSize: '.8rem', fontWeight: 600, marginLeft: '.5rem',
+          }}>
+            Filtered to: {hospitalName}
+            <button
+              onClick={() => setHospitalId(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--teal-700)', fontWeight: 800, padding: 0, lineHeight: 1 }}
+            >
+              ✕
+            </button>
+          </span>
+        )}
       </div>
 
-      {/* Stat cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+      {/* Stat cards — 8 KPIs, two rows of four */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
         <StatCard
           value={volLoading ? '…' : totalScreened}
           label="Babies Screened"
@@ -326,6 +252,37 @@ export default function AnalyticsPage() {
           icon="👁"
           onClick={onAtRiskClick}
         />
+        <StatCard
+          value={kpiLoading ? '…' : kpiExtra?.total_exams}
+          label="Exams Recorded"
+          sub="in period"
+          color="var(--teal-600)"
+          icon="🔬"
+        />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+        <StatCard
+          value={kpiLoading ? '…' : (kpiExtra?.treatment_rate != null ? `${kpiExtra.treatment_rate}%` : null)}
+          label="Treatment Rate"
+          sub="of screened babies"
+          color="var(--amber-600)"
+          icon="⚕"
+        />
+        <StatCard
+          value={kpiLoading ? '…' : (kpiExtra?.screening_coverage != null ? `${kpiExtra.screening_coverage}%` : null)}
+          label="Screening Coverage"
+          sub="enrolled babies examined"
+          color="var(--teal-600)"
+          icon="✓"
+        />
+        <StatCard
+          value={kpiLoading ? '…' : (kpiExtra?.avg_days_to_first_exam != null ? `${kpiExtra.avg_days_to_first_exam}d` : null)}
+          label="Avg Days to First Exam"
+          sub="from enrollment"
+          color="var(--gray-600)"
+          icon="📅"
+        />
+        <div />
       </div>
 
       {/* Charts */}
@@ -403,6 +360,16 @@ export default function AnalyticsPage() {
           </div>
         </ChartCard>
       </div>
+
+      <DiseaseBurdenSection fromDate={fromDate} toDate={toDate} hospitalId={hospitalId} />
+      <TreatmentSection fromDate={fromDate} toDate={toDate} hospitalId={hospitalId} />
+      <LtfuDeepDiveSection fromDate={fromDate} toDate={toDate} hospitalId={hospitalId} tfKey={tfKey} />
+      <AdherenceSection fromDate={fromDate} toDate={toDate} hospitalId={hospitalId} />
+      <ProgrammePerformanceSection fromDate={fromDate} toDate={toDate} hospitalId={hospitalId} />
+      <PatientProfileSection fromDate={fromDate} toDate={toDate} hospitalId={hospitalId} />
+      <VisualOutcomesSection fromDate={fromDate} toDate={toDate} hospitalId={hospitalId} />
+      <ReminderPerformanceSection fromDate={fromDate} toDate={toDate} hospitalId={hospitalId} />
+      <HospitalComparisonSection fromDate={fromDate} toDate={toDate} onSelectHospital={setHospitalId} />
 
       {/* Drill-down modal */}
       {modal && (

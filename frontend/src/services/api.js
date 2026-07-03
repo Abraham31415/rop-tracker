@@ -128,8 +128,20 @@ export const sendTestSms = (phone) => api.post('/api/reminders/test-sms', null, 
 export const getScreeningVolume = (params) => api.get('/api/analytics/screening-volume', { params }).then(r => r.data)
 export const getLtfuRate        = (params) => api.get('/api/analytics/ltfu-rate', { params }).then(r => r.data)
 export const getAtRiskTrend     = (params) => api.get('/api/analytics/at-risk-trend', { params }).then(r => r.data)
-export const getAtRiskBabies    = ()       => api.get('/api/analytics/at-risk-babies').then(r => r.data)
+export const getAtRiskBabies    = (params) => api.get('/api/analytics/at-risk-babies', { params }).then(r => r.data)
 export const getLtfuBabies      = (params) => api.get('/api/analytics/ltfu-babies', { params }).then(r => r.data)
+
+export const getKpiExtra                = (params) => api.get('/api/analytics/kpi-extra', { params }).then(r => r.data)
+export const getRopFindingsDistribution = (params) => api.get('/api/analytics/rop-findings-distribution', { params }).then(r => r.data)
+export const getTreatmentAnalytics      = (params) => api.get('/api/analytics/treatment-analytics', { params }).then(r => r.data)
+export const getLtfuDeepDive            = (params) => api.get('/api/analytics/ltfu-deep-dive', { params }).then(r => r.data)
+export const getAdherence               = (params) => api.get('/api/analytics/adherence', { params }).then(r => r.data)
+export const getProgrammePerformance    = (params) => api.get('/api/analytics/programme-performance', { params }).then(r => r.data)
+export const getPatientProfile          = (params) => api.get('/api/analytics/patient-profile', { params }).then(r => r.data)
+export const getVisualOutcomes          = (params) => api.get('/api/analytics/visual-outcomes', { params }).then(r => r.data)
+export const getReminderPerformance     = (params) => api.get('/api/analytics/reminder-performance', { params }).then(r => r.data)
+export const getHospitalComparison      = (params) => api.get('/api/analytics/hospital-comparison', { params }).then(r => r.data)
+export const getFlaggedUntreatedBabies  = (params) => api.get('/api/analytics/flagged-untreated-babies', { params }).then(r => r.data)
 
 // ── SMS Templates ─────────────────────────────────────────────────────────────
 export const getTemplates = () => api.get('/api/templates/').then(r => r.data)
