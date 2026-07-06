@@ -107,7 +107,7 @@ export default function PatientProfileSection({ fromDate, toDate, hospitalId }) 
                     <td style={{ padding: '.6rem .9rem', fontWeight: 600, color: 'var(--gray-800)' }}>{row.label}</td>
                     <td style={{ padding: '.6rem .9rem', textAlign: 'center', color: 'var(--gray-700)' }}>{row.n}</td>
                     <td style={{ padding: '.6rem .9rem', textAlign: 'center', color: 'var(--gray-700)' }}>
-                      {row.avg_worst_stage_rank != null ? `${row.avg_worst_stage_rank} (${STAGE_RANK_LABELS[String(Math.round(row.avg_worst_stage_rank))] ?? '—'})` : '—'}
+                      {row.avg_worst_stage_rank != null ? `${row.avg_worst_stage_rank} (${STAGE_RANK_LABELS[String(Math.round(row.avg_worst_stage_rank))] ?? '-'})` : '-'}
                     </td>
                   </tr>
                 ))}

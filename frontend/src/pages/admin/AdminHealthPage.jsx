@@ -24,7 +24,7 @@ const AT_SANDBOX_TOOLTIP =
 // ── Formatters ────────────────────────────────────────────────────────────────
 
 function fmtBytes(bytes) {
-  if (bytes == null) return '—'
+  if (bytes == null) return '-'
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
   return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`
@@ -57,7 +57,7 @@ function fmtDuration(ms) {
 }
 
 function fmtDatetime(isoStr) {
-  if (!isoStr) return '—'
+  if (!isoStr) return '-'
   return new Date(isoStr).toLocaleString('en-GB', {
     day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
   })
@@ -130,7 +130,7 @@ function HealthRow({ label, labelSub, value, status, sub, subColor }) {
         )}
       </span>
       <span style={{ fontSize: '.85rem', fontWeight: 600, color: '#0F172A', display: 'inline-flex', alignItems: 'center', gap: '.3rem' }}>
-        {value ?? '—'}
+        {value ?? '-'}
       </span>
       {sub && (
         <span style={{ fontSize: '.72rem', color: subColor || '#94A3B8', marginLeft: '.1rem', whiteSpace: 'nowrap' }}>
@@ -169,7 +169,7 @@ function RecentAlerts({ alerts }) {
         fontSize: '.83rem', color: '#166534', fontWeight: 500,
       }}>
         <Dot status="green" />
-        No alerts in the last 7 days — all systems stable.
+        No alerts in the last 7 days. All systems stable.
       </div>
     )
   }
@@ -289,7 +289,7 @@ export default function AdminHealthPage() {
   const dbPct = db.size_bytes ? ((db.size_bytes / DB_FREE_TIER_BYTES) * 100).toFixed(1) : null
   const dbValue = db.size_bytes
     ? `${fmtBytes(db.size_bytes)} / 500 MB`
-    : '—'
+    : '-'
   const dbSub = dbPct ? `${dbPct}% used` : undefined
   const dbStatus = dbPct == null ? 'grey'
     : dbPct < 60 ? 'blue'
@@ -323,7 +323,7 @@ export default function AdminHealthPage() {
           </p>
         </div>
         <span style={{ fontSize: '.72rem', color: '#94A3B8', paddingTop: '.25rem' }}>
-          Updated {secondsAgo < 5 ? 'just now' : `${secondsAgo}s ago`} — auto-refreshes every 60s
+          Updated {secondsAgo < 5 ? 'just now' : `${secondsAgo}s ago`}, auto-refreshes every 60s
         </span>
       </div>
 
@@ -353,10 +353,10 @@ export default function AdminHealthPage() {
             value={sms.failed_this_week}
             status={sms.failed_this_week === 0 ? 'green' : sms.failed_this_week < 5 ? 'yellow' : 'red'} />
           <HealthRow label="Delivery Rate (30d)"
-            value={sms.at_simulating ? simulatedLabel : sms.delivery_rate_month != null ? `${sms.delivery_rate_month}%` : '—'}
+            value={sms.at_simulating ? simulatedLabel : sms.delivery_rate_month != null ? `${sms.delivery_rate_month}%` : '-'}
             status={smsDeliveryStatus} />
           <HealthRow label="AT Balance"
-            value={sms.at_simulating ? sandboxLabel : sms.at_balance != null ? `${sms.at_balance.toLocaleString()} UGX` : '—'}
+            value={sms.at_simulating ? sandboxLabel : sms.at_balance != null ? `${sms.at_balance.toLocaleString()} UGX` : '-'}
             status={atStatus} />
         </HealthCard>
 
@@ -410,7 +410,7 @@ export default function AdminHealthPage() {
 
         <HealthCard title="Server &amp; Database" accent="#10B981">
           <HealthRow label="API Latency"
-            value={latencyMs != null ? `${latencyMs} ms` : '—'}
+            value={latencyMs != null ? `${latencyMs} ms` : '-'}
             status={latencyMs == null ? 'grey' : latencyMs < 200 ? 'green' : latencyMs < 500 ? 'yellow' : 'red'} />
           <HealthRow label="DB Size"
             value={dbValue}

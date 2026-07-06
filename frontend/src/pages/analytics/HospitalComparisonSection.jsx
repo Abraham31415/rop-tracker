@@ -84,10 +84,10 @@ export default function HospitalComparisonSection({ fromDate, toDate, onSelectHo
                     <td style={{ padding: '.6rem .9rem', color: 'var(--gray-700)' }}>{h.exams}</td>
                     <td style={{ padding: '.6rem .9rem', fontWeight: 700, color: rateColor(h.ltfu_rate) }}>{h.ltfu_rate}%</td>
                     <td style={{ padding: '.6rem .9rem', color: 'var(--gray-700)' }}>{h.treatment_rate}%</td>
-                    <td style={{ padding: '.6rem .9rem', color: 'var(--gray-700)' }}>{h.avg_days_to_first_exam != null ? `${h.avg_days_to_first_exam}d` : '—'}</td>
+                    <td style={{ padding: '.6rem .9rem', color: 'var(--gray-700)' }}>{h.avg_days_to_first_exam != null ? `${h.avg_days_to_first_exam}d` : '-'}</td>
                     <td style={{ padding: '.6rem .9rem', color: 'var(--gray-700)' }}>{h.sms_delivery_rate}%</td>
                     <td style={{ padding: '.6rem .9rem', color: 'var(--gray-500)', whiteSpace: 'nowrap' }}>
-                      {h.last_activity ? format(new Date(h.last_activity), 'd MMM yyyy') : '—'}
+                      {h.last_activity ? format(new Date(h.last_activity), 'd MMM yyyy') : '-'}
                     </td>
                   </tr>
                 ))}

@@ -48,7 +48,7 @@ export default function VisualOutcomesSection({ fromDate, toDate, hospitalId }) 
             {isLoading ? '…' : data?.blindness_prevention_count ?? 0}
           </div>
           <div style={{ fontSize: '.85rem', color: 'var(--gray-600)', maxWidth: 220 }}>
-            babies treated before Stage 4/5 — blindness potentially prevented
+            babies treated before Stage 4/5, blindness potentially prevented
           </div>
         </div>
       </div>

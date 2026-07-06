@@ -13,10 +13,10 @@ import { ChartCard, SectionHeading, ChartTooltip, BabyModal, STAGE_LABELS, ZONE_
 const FLAGGED_COLS = [
   { key: 'full_name',           label: 'Baby',             render: b => <Link to={`/babies/${b.id}`} style={{ color: 'var(--teal-600)', fontWeight: 600 }}>{getBabyDisplayName(b)}</Link> },
   { key: 'hospital_name',       label: 'Hospital' },
-  { key: 'zone',                label: 'Zone',             render: b => ZONE_LABELS[b.zone] ?? b.zone ?? '—' },
-  { key: 'stage',               label: 'Stage',            render: b => STAGE_LABELS[b.stage] ?? b.stage ?? '—' },
-  { key: 'last_exam_date',      label: 'Last Exam',        render: b => b.last_exam_date ? format(new Date(b.last_exam_date), 'd MMM yyyy') : '—' },
-  { key: 'days_since_diagnosis', label: 'Days Since Dx',  render: b => b.days_since_diagnosis != null ? `${b.days_since_diagnosis}d` : '—' },
+  { key: 'zone',                label: 'Zone',             render: b => ZONE_LABELS[b.zone] ?? b.zone ?? '-' },
+  { key: 'stage',               label: 'Stage',            render: b => STAGE_LABELS[b.stage] ?? b.stage ?? '-' },
+  { key: 'last_exam_date',      label: 'Last Exam',        render: b => b.last_exam_date ? format(new Date(b.last_exam_date), 'd MMM yyyy') : '-' },
+  { key: 'days_since_diagnosis', label: 'Days Since Dx',  render: b => b.days_since_diagnosis != null ? `${b.days_since_diagnosis}d` : '-' },
 ]
 
 export default function TreatmentSection({ fromDate, toDate, hospitalId }) {
@@ -65,7 +65,7 @@ export default function TreatmentSection({ fromDate, toDate, hospitalId }) {
 
         <ChartCard
           title="Treatment Timing"
-          sub="Stage at which babies were treated — ideal: mostly Stage 2-3"
+          sub="Stage at which babies were treated (ideal: mostly Stage 2-3)"
           loading={isLoading}
           empty={!isLoading && timing.every(t => t.count === 0)}
           emptyText="No treated babies recorded yet"

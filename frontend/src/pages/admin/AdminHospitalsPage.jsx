@@ -522,7 +522,7 @@ export default function AdminHospitalsPage() {
                   background: '#DCFCE7', border: '1px solid #86EFAC', borderRadius: 4,
                   padding: '2px 8px', fontSize: '.78rem', color: '#166534',
                 }}>
-                  <strong style={{ fontFamily: 'monospace' }}>{a.code}</strong> — {a.name}
+                  <strong style={{ fontFamily: 'monospace' }}>{a.code}</strong>: {a.name}
                 </span>
               ))}
             </div>

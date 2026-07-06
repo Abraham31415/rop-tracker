@@ -78,7 +78,7 @@ export default function AdherenceSection({ fromDate, toDate, hospitalId }) {
         </ChartCard>
 
         <StatCard
-          value={isLoading ? '…' : (data?.avg_reminders_before_attendance ?? '—')}
+          value={isLoading ? '…' : (data?.avg_reminders_before_attendance ?? '-')}
           label="Avg Reminders Before Attendance"
           sub="per attended appointment"
           color="var(--gray-600)"

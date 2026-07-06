@@ -23,9 +23,9 @@ export default function ReminderPerformanceSection({ fromDate, toDate, hospitalI
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
         <StatCard value={isLoading ? '…' : data?.total_sent} label="Total SMS Sent" sub="in period" color="var(--teal-600)" icon="✉" />
-        <StatCard value={isLoading ? '…' : (data?.delivery_rate != null ? `${data.delivery_rate}%` : '—')} label="Delivery Rate" sub="successfully sent" color="var(--teal-600)" icon="✓" />
-        <StatCard value={isLoading ? '…' : (data?.failure_rate != null ? `${data.failure_rate}%` : '—')} label="Failure Rate" sub="failed to send" color="var(--red-600)" icon="✕" />
-        <StatCard value={isLoading ? '…' : (data?.avg_reminders_before_attendance ?? '—')} label="Avg Reminders / Attendance" sub="before baby was seen" color="var(--gray-600)" icon="🔁" />
+        <StatCard value={isLoading ? '…' : (data?.delivery_rate != null ? `${data.delivery_rate}%` : '-')} label="Delivery Rate" sub="successfully sent" color="var(--teal-600)" icon="✓" />
+        <StatCard value={isLoading ? '…' : (data?.failure_rate != null ? `${data.failure_rate}%` : '-')} label="Failure Rate" sub="failed to send" color="var(--red-600)" icon="✕" />
+        <StatCard value={isLoading ? '…' : (data?.avg_reminders_before_attendance ?? '-')} label="Avg Reminders / Attendance" sub="before baby was seen" color="var(--gray-600)" icon="🔁" />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>

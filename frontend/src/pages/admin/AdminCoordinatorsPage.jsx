@@ -206,7 +206,7 @@ export default function AdminCoordinatorsPage() {
                     {ROLE_LABELS[u.role] || u.role}
                   </span>
                 </td>
-                <td style={{ padding: '.75rem 1rem', color: '#64748B' }}>{u.hospital_name || '—'}</td>
+                <td style={{ padding: '.75rem 1rem', color: '#64748B' }}>{u.hospital_name || '-'}</td>
                 <td style={{ padding: '.75rem 1rem' }}>
                   <span style={{
                     background: u.is_active ? '#F0FDF4' : '#FFF7ED',

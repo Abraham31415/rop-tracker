@@ -171,7 +171,7 @@ export default function AllBabiesPage() {
                           border: '1px solid var(--teal-200)', borderRadius: 4,
                           padding: '2px 6px', whiteSpace: 'nowrap',
                         }}>{b.rop_id}</span>
-                      ) : <span style={{ color: 'var(--gray-300)', fontSize: '.75rem' }}>—</span>}
+                      ) : <span style={{ color: 'var(--gray-300)', fontSize: '.75rem' }}>-</span>}
                     </td>
                     <td>
                       <div style={{ fontWeight: 500, fontSize: '.85rem' }}>{b.caregiver_name}</div>

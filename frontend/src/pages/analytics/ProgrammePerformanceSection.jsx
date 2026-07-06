@@ -25,7 +25,7 @@ export default function ProgrammePerformanceSection({ fromDate, toDate, hospital
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
         <ChartCard
           title="Time: Birth → First Exam"
-          sub={`Target: before 4 weeks for babies under 30wk GA${data?.time_to_first_exam?.pct_under_30wk_on_target != null ? ` — ${data.time_to_first_exam.pct_under_30wk_on_target}% on target` : ''}`}
+          sub={`Target: before 4 weeks for babies under 30wk GA${data?.time_to_first_exam?.pct_under_30wk_on_target != null ? ` (${data.time_to_first_exam.pct_under_30wk_on_target}% on target)` : ''}`}
           loading={isLoading}
           empty={!isLoading && firstExamTotal === 0}
           emptyText="No exam data recorded yet"
@@ -43,7 +43,7 @@ export default function ProgrammePerformanceSection({ fromDate, toDate, hospital
 
         <ChartCard
           title="Time: Stage 2+ Diagnosis → Treatment"
-          sub={`Target: under 7 days${data?.time_to_treatment?.pct_within_7_days != null ? ` — ${data.time_to_treatment.pct_within_7_days}% within target` : ''}`}
+          sub={`Target: under 7 days${data?.time_to_treatment?.pct_within_7_days != null ? ` (${data.time_to_treatment.pct_within_7_days}% within target)` : ''}`}
           loading={isLoading}
           empty={!isLoading && treatmentTotal === 0}
           emptyText="No treated babies recorded yet"
@@ -62,14 +62,14 @@ export default function ProgrammePerformanceSection({ fromDate, toDate, hospital
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
         <StatCard
-          value={isLoading ? '…' : (data?.exam_frequency_compliance_pct != null ? `${data.exam_frequency_compliance_pct}%` : '—')}
+          value={isLoading ? '…' : (data?.exam_frequency_compliance_pct != null ? `${data.exam_frequency_compliance_pct}%` : '-')}
           label="Exam Frequency Compliance"
           sub="next exam within recommended interval"
           color="var(--teal-600)"
           icon="📆"
         />
         <StatCard
-          value={isLoading ? '…' : (data?.bilateral_completeness_pct != null ? `${data.bilateral_completeness_pct}%` : '—')}
+          value={isLoading ? '…' : (data?.bilateral_completeness_pct != null ? `${data.bilateral_completeness_pct}%` : '-')}
           label="Bilateral Exam Completeness"
           sub="exams with both eyes recorded"
           color="var(--teal-600)"

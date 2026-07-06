@@ -26,18 +26,18 @@ export default function LtfuDeepDiveSection({ fromDate, toDate, hospitalId }) {
 
   return (
     <>
-      <SectionHeading title="LTFU Analysis" sub="Loss-to-follow-up deep dive — where, when, and whether babies come back" />
+      <SectionHeading title="LTFU Analysis" sub="Loss-to-follow-up deep dive: where, when, and whether babies come back" />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
         <StatCard value={isLoading ? '…' : data?.total_episodes} label="Total LTFU Episodes" sub="in period" color="var(--red-600)" icon="⚠" />
-        <StatCard value={isLoading ? '…' : (data?.median_days_overdue != null ? `${data.median_days_overdue}d` : '—')} label="Median Days Overdue" sub="when flagged LTFU" color="var(--amber-600)" icon="⏱" />
-        <StatCard value={isLoading ? '…' : (data?.recovery_rate != null ? `${data.recovery_rate}%` : '—')} label="Recovery Rate" sub="LTFU babies who came back" color="var(--teal-600)" icon="↩" />
+        <StatCard value={isLoading ? '…' : (data?.median_days_overdue != null ? `${data.median_days_overdue}d` : '-')} label="Median Days Overdue" sub="when flagged LTFU" color="var(--amber-600)" icon="⏱" />
+        <StatCard value={isLoading ? '…' : (data?.recovery_rate != null ? `${data.recovery_rate}%` : '-')} label="Recovery Rate" sub="LTFU babies who came back" color="var(--teal-600)" icon="↩" />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
         <ChartCard
           title="LTFU by Hospital"
-          sub="Count and rate — green <20%, amber 20-40%, red >40%"
+          sub="Count and rate (green under 20%, amber 20-40%, red over 40%)"
           loading={isLoading}
           empty={!isLoading && byHospital.length === 0}
           emptyText="No LTFU data recorded yet"
@@ -78,7 +78,7 @@ export default function LtfuDeepDiveSection({ fromDate, toDate, hospitalId }) {
 
       <ChartCard
         title="LTFU Rate Over Time"
-        sub="Monthly trend — the clearest signal of whether the programme is improving"
+        sub="Monthly trend: the clearest signal of whether the programme is improving"
         loading={overTimeLoading}
         empty={!overTimeLoading && overTime.length === 0}
         emptyText="No appointment data recorded yet"

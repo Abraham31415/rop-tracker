@@ -38,7 +38,7 @@ export function StatCard({ value, label, sub, color, icon, onClick }) {
         )}
       </div>
       <div style={{ fontSize: '2rem', fontWeight: 800, letterSpacing: '-.04em', color: 'var(--gray-900)', lineHeight: 1, marginTop: '.4rem' }}>
-        {value ?? '—'}
+        {value ?? '-'}
       </div>
       <div style={{ fontSize: '.8rem', fontWeight: 700, color: 'var(--gray-600)', textTransform: 'uppercase', letterSpacing: '.05em' }}>
         {label}
@@ -127,7 +127,7 @@ export function BabyModal({ title, babies, loading, columns, onClose }) {
                   <tr key={b.id} style={{ borderTop: '1px solid var(--gray-100)', background: i % 2 ? 'var(--gray-50)' : 'var(--surface)' }}>
                     {columns.map(c => (
                       <td key={c.key} style={{ padding: '.65rem .9rem', color: 'var(--gray-800)', whiteSpace: c.wrap ? 'normal' : 'nowrap' }}>
-                        {c.render ? c.render(b) : (b[c.key] ?? '—')}
+                        {c.render ? c.render(b) : (b[c.key] ?? '-')}
                       </td>
                     ))}
                   </tr>
@@ -167,5 +167,5 @@ export function rateColor(pct) {
 }
 
 export function fmtPct(v) {
-  return v == null ? '—' : `${v}%`
+  return v == null ? '-' : `${v}%`
 }
