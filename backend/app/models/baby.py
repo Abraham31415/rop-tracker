@@ -47,12 +47,12 @@ class Baby(Base):
 
     # Identity
     full_name = Column(String, nullable=False)
-    date_of_birth = Column(Date, nullable=False)
-    sex = Column(Enum(Sex, values_callable=lambda x: [e.name for e in x]), nullable=False)
+    date_of_birth = Column(Date, nullable=True)  # may be unknown at enrollment (e.g. incomplete register data)
+    sex = Column(Enum(Sex, values_callable=lambda x: [e.name for e in x]), nullable=True)
 
     # Birth metrics
-    birth_weight_grams = Column(Float, nullable=False)
-    gestational_age_weeks = Column(Float, nullable=False)  # e.g. 28.5 weeks
+    birth_weight_grams = Column(Float, nullable=True)
+    gestational_age_weeks = Column(Float, nullable=True)  # e.g. 28.5 weeks
     postnatal_age_days = Column(Integer, nullable=True)    # at first exam
 
     # Risk factors (boolean flags)

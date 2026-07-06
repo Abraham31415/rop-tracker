@@ -105,6 +105,13 @@ class Exam(Base):
     treatment_recommended = Column(String, nullable=True)  # laser / bevacizumab / surgery
     notes = Column(Text, nullable=True)
 
+    # Original, unparsed finding text (e.g. from a bulk-imported register), kept alongside
+    # whatever structured zone/stage was derived from it.
+    right_raw_finding = Column(Text, nullable=True)
+    left_raw_finding = Column(Text, nullable=True)
+    # True when the baby's date_of_birth was imputed (exam_date - postnatal age) rather than recorded directly.
+    dob_estimated = Column(Boolean, default=False)
+
     # Visual Function Assessment
     vf_right_fixation = Column(Enum(VFFixation, name='vffixation', values_callable=lambda x: [e.name for e in x]), nullable=True)
     vf_right_following = Column(Enum(VFFollowing, name='vffollowing', values_callable=lambda x: [e.name for e in x]), nullable=True)
