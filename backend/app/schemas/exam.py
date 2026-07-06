@@ -51,6 +51,11 @@ class ExamCreate(BaseModel):
     rv_right: Optional[str] = None
     rv_left: Optional[str] = None
 
+    # Optional manual override of the auto-scheduled next review date.
+    # Not Exam columns — consumed by the appointment-creation logic in record_exam.
+    next_review_override_date: Optional[date] = None
+    next_review_override_reason: Optional[str] = None
+
 
 class ExamOut(BaseModel):
     id: UUID

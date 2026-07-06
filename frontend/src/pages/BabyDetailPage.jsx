@@ -1,26 +1,27 @@
 import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getBaby, listExams, listReminders, logPhoneCall, listHospitals, getOutcome, upsertOutcome, listReferrals, createReferral, updateReferralStatus, updateBaby, getContactLogs, addContactNote, updateDilation, dischargeBaby, reactivateBaby, retrySMS } from '../services/api'
+import { getBaby, listExams, listReminders, logPhoneCall, listHospitals, getOutcome, upsertOutcome, listReferrals, createReferral, updateReferralStatus, updateBaby, getContactLogs, addContactNote, updateDilation, dischargeBaby, reactivateBaby, retrySMS, listAppointments, rescheduleAppointment } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { format, formatDistanceToNow } from 'date-fns'
 import { generateBabyFullPDF, generateSingleVisitPDF } from '../services/pdfExport'
 import { getBabyDisplayName } from '../utils/babyName'
+import { REVIEW_DATE_REASONS, resolveReason, validateReviewDate } from '../utils/reviewDate'
 
 // ── SMS error → human-readable message ───────────────────────────────────────
 function mapSmsError(raw) {
-  if (!raw) return 'SMS delivery failed — please contact parent directly'
+  if (!raw) return 'SMS delivery failed: please contact parent directly'
   const e = raw.toLowerCase()
   if (/ssl|connection error|econnrefused|network|connect timed out/.test(e))
-    return 'Could not reach SMS provider — network issue'
+    return 'Could not reach SMS provider: network issue'
   if (/invalid.*phone|phone.*invalid|invalid destination|not a valid|unreachable/.test(e))
     return 'Phone number is invalid or unreachable'
   if (/balance|credit|insufficient|low funds/.test(e))
-    return 'SMS not sent — account balance too low'
+    return 'SMS not sent: account balance too low'
   if (/timeout|timed out/.test(e))
-    return 'SMS provider did not respond — will retry'
-  return 'SMS delivery failed — please contact parent directly'
+    return 'SMS provider did not respond, will retry'
+  return 'SMS delivery failed: please contact parent directly'
 }
 
 // ── Labels ────────────────────────────────────────────────────────────────────
@@ -786,6 +787,143 @@ function ReferralSection({ babyId, babyHospitalId, canEdit }) {
   )
 }
 
+// ── Next review date card (editable) ──────────────────────────────────────────
+function NextReviewCard({ babyId, canEdit }) {
+  const qc = useQueryClient()
+  const [editing, setEditing] = useState(false)
+  const [newDate, setNewDate] = useState('')
+  const [reasonSelect, setReasonSelect] = useState('')
+  const [reasonOther, setReasonOther] = useState('')
+  const [confirmedLong, setConfirmedLong] = useState(false)
+
+  const { data: appointments = [], isLoading } = useQuery({
+    queryKey: ['appointments', babyId],
+    queryFn: () => listAppointments(babyId),
+    enabled: !!babyId,
+  })
+  const scheduled = appointments.find(a => a.status === 'scheduled')
+
+  const reason = resolveReason(reasonSelect, reasonOther)
+  const { error: dateError, warning: dateWarning } = validateReviewDate(newDate)
+
+  const startEdit = () => {
+    setNewDate(scheduled?.due_date || '')
+    setReasonSelect('')
+    setReasonOther('')
+    setConfirmedLong(false)
+    setEditing(true)
+  }
+
+  const mutation = useMutation({
+    mutationFn: () => rescheduleAppointment(scheduled.id, newDate, reason),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['appointments', babyId] })
+      qc.invalidateQueries({ queryKey: ['contact-logs', babyId] })
+      qc.invalidateQueries({ queryKey: ['baby', babyId] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      setEditing(false)
+    },
+  })
+
+  const canSave = newDate && reason && !dateError && (!dateWarning || confirmedLong) && !mutation.isPending
+
+  if (editing && scheduled) {
+    return (
+      <div className="card">
+        <SectionHeading>Next Review Date</SectionHeading>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '.7rem' }}>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label">New Review Date</label>
+            <input
+              type="date"
+              className="form-control"
+              value={newDate}
+              onChange={e => { setNewDate(e.target.value); setConfirmedLong(false) }}
+            />
+          </div>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label">Reason *</label>
+            <select className="form-control" value={reasonSelect} onChange={e => setReasonSelect(e.target.value)}>
+              <option value="">Select a reason...</option>
+              {REVIEW_DATE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+            {reasonSelect === 'Other' && (
+              <input
+                type="text"
+                className="form-control"
+                style={{ marginTop: '.4rem' }}
+                placeholder="Please specify the reason"
+                value={reasonOther}
+                onChange={e => setReasonOther(e.target.value)}
+              />
+            )}
+          </div>
+          {dateError && (
+            <div className="alert alert-error" style={{ fontSize: '.8rem', padding: '.4rem .65rem' }}>
+              {dateError}
+            </div>
+          )}
+          {!dateError && dateWarning && (
+            <div style={{ fontSize: '.8rem', padding: '.5rem .65rem', borderRadius: 'var(--radius-sm)', background: 'var(--amber-50)', border: '1px solid var(--amber-500)', color: 'var(--amber-700, #b45309)' }}>
+              <div style={{ marginBottom: '.4rem' }}>{dateWarning}</div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '.4rem', fontWeight: 600, cursor: 'pointer' }}>
+                <input type="checkbox" checked={confirmedLong} onChange={e => setConfirmedLong(e.target.checked)} />
+                Yes, use this date
+              </label>
+            </div>
+          )}
+          {mutation.error && (
+            <div className="alert alert-error" style={{ fontSize: '.8rem', padding: '.4rem .65rem' }}>
+              {mutation.error.response?.data?.detail || 'Failed to save review date.'}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'flex-end' }}>
+            <button className="btn btn-secondary btn-sm" onClick={() => setEditing(false)} disabled={mutation.isPending}>Cancel</button>
+            <button className="btn btn-primary btn-sm" onClick={() => mutation.mutate()} disabled={!canSave}>
+              {mutation.isPending ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="card">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '.75rem' }}>
+        <SectionHeading>Next Review Date</SectionHeading>
+        {canEdit && scheduled && (
+          <button
+            className="btn btn-secondary btn-sm"
+            style={{ marginTop: '-.15rem' }}
+            onClick={startEdit}
+            title="Edit review date"
+          >
+            ✎ Edit
+          </button>
+        )}
+      </div>
+      {isLoading ? (
+        <p style={{ fontSize: '.83rem', color: 'var(--gray-400)' }}>Loading...</p>
+      ) : scheduled ? (
+        <div>
+          <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--gray-900)' }}>
+            {format(new Date(scheduled.due_date + 'T00:00:00'), 'dd MMMM yyyy')}
+          </div>
+          <div style={{ fontSize: '.75rem', color: 'var(--gray-400)', marginTop: '.2rem' }}>
+            {scheduled.date_source === 'manual' ? 'Manually set' : 'Auto-scheduled'}
+            {scheduled.date_source === 'manual' && scheduled.date_change_reason ? `: ${scheduled.date_change_reason}` : ''}
+          </div>
+        </div>
+      ) : (
+        <p style={{ fontSize: '.83rem', color: 'var(--gray-400)', textAlign: 'center', padding: '.5rem 0' }}>
+          No upcoming review scheduled.
+        </p>
+      )}
+    </div>
+  )
+}
+
 // ── Caregiver & Contact edit card ─────────────────────────────────────────────
 function CaregiverCard({ baby, canEdit }) {
   const qc = useQueryClient()
@@ -1325,6 +1463,7 @@ export default function BabyDetailPage() {
   const canDischarge   = ['ophthalmologist', 'hospital_coordinator', 'central_coordinator'].includes(user?.role)
   const canReactivate  = isCoordinator
   const canEditCaregiver = isCoordinator || isNurse
+  const canEditReviewDate = ['ophthalmologist', 'hospital_coordinator', 'central_coordinator'].includes(user?.role)
 
   const { data: baby, isLoading: babyLoading } = useQuery({
     queryKey: ['baby', id],
@@ -1555,6 +1694,9 @@ export default function BabyDetailPage() {
               </div>
             </div>
           )}
+
+          {/* Next review date (editable) */}
+          <NextReviewCard babyId={id} canEdit={canEditReviewDate} />
 
           {/* Caregiver / contact (editable) */}
           <CaregiverCard baby={baby} canEdit={canEditCaregiver} />

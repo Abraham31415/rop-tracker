@@ -1,5 +1,6 @@
 from __future__ import annotations
 from uuid import UUID
+from datetime import date, datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -7,6 +8,7 @@ from app.database import get_db
 from app.models.exam import Exam
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.baby import Baby
+from app.models.contact_log import ContactLog, ContactLogType
 from app.models.hospital import Hospital
 from app.models.user import User, UserRole
 from app.schemas.exam import ExamCreate, ExamOut
@@ -76,7 +78,13 @@ def record_exam(
     if current_user.role not in (UserRole.OPHTHALMOLOGIST, UserRole.CENTRAL_COORDINATOR):
         raise HTTPException(status_code=403, detail="Only ophthalmologists can record exams")
 
-    exam = Exam(**data.model_dump(), examiner_id=current_user.id)
+    override_date = data.next_review_override_date
+    override_reason = data.next_review_override_reason
+    if override_date is not None and override_date < date.today():
+        raise HTTPException(status_code=400, detail="Review date cannot be in the past")
+
+    exam_data = data.model_dump(exclude={"next_review_override_date", "next_review_override_reason"})
+    exam = Exam(**exam_data, examiner_id=current_user.id)
 
     # Derive worst finding and next appointment interval
     worst_zone, worst_stage, has_plus = derive_worst_finding(exam)
@@ -101,15 +109,34 @@ def record_exam(
     for a in open_appts:
         a.status = AppointmentStatus.ATTENDED
 
-    # Auto-create the next appointment
-    due = next_due_date(data.exam_date, weeks)
-    appointment = Appointment(
-        baby_id=data.baby_id,
-        exam_id=exam.id,
-        due_date=due,
-        status=AppointmentStatus.SCHEDULED,
-    )
+    # Auto-create the next appointment (or use a manual override date if supplied)
+    auto_due = next_due_date(data.exam_date, weeks)
+    if override_date is not None:
+        appointment = Appointment(
+            baby_id=data.baby_id,
+            exam_id=exam.id,
+            due_date=override_date,
+            status=AppointmentStatus.SCHEDULED,
+            date_source="manual",
+            date_change_reason=override_reason,
+            date_changed_at=datetime.now(timezone.utc),
+            date_changed_by_id=current_user.id,
+        )
+        override_note = (
+            f"Next review date manually overridden to {override_date.isoformat()} "
+            f"(auto-scheduled would have been {auto_due.isoformat()}). "
+            f"Reason: {override_reason or '(none given)'}"
+        )
+        exam.notes = f"{exam.notes}\n{override_note}" if exam.notes else override_note
+    else:
+        appointment = Appointment(
+            baby_id=data.baby_id,
+            exam_id=exam.id,
+            due_date=auto_due,
+            status=AppointmentStatus.SCHEDULED,
+        )
     db.add(appointment)
+    db.flush()
     write_audit(
         db,
         user_id=current_user.id,
@@ -126,6 +153,33 @@ def record_exam(
             "treatment_recommended": exam.treatment_recommended,
         },
     )
+    if override_date is not None:
+        write_audit(
+            db,
+            user_id=current_user.id,
+            user_name=current_user.full_name,
+            user_role=current_user.role.value,
+            action_type="RESCHEDULE",
+            entity_type="Appointment",
+            entity_id=str(appointment.id),
+            details={
+                "baby_id": str(data.baby_id),
+                "old_date": auto_due.isoformat(),
+                "new_date": override_date.isoformat(),
+                "reason": override_reason,
+                "source": "exam_override",
+            },
+        )
+        db.add(ContactLog(
+            baby_id=data.baby_id,
+            created_by_id=current_user.id,
+            log_type=ContactLogType.NOTE,
+            message=(
+                f"Review date set to {override_date.isoformat()} at exam "
+                f"(overriding auto-scheduled {auto_due.isoformat()}) by {current_user.full_name}. "
+                f"Reason: {override_reason or '(none given)'}"
+            ),
+        ))
     db.commit()
     db.refresh(exam)
     return exam

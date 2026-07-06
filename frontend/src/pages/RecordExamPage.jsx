@@ -5,6 +5,7 @@ import { getBaby, listExams, recordExam } from '../services/api'
 import { useTheme } from '../contexts/ThemeContext'
 import { format, addWeeks } from 'date-fns'
 import { getBabyDisplayName } from '../utils/babyName'
+import { REVIEW_DATE_REASONS, resolveReason, validateReviewDate } from '../utils/reviewDate'
 
 // ── ROP scheduling logic ──────────────────────────────────────────────────────
 const ZONE_RANK  = { zone_i: 1, zone_ii: 2, zone_iii: 3 }
@@ -493,6 +494,13 @@ export default function RecordExamPage() {
   const [submitting, setSubmitting]     = useState(false)
   const [error, setError]               = useState('')
 
+  // Manual override of the auto-scheduled next review date
+  const [overrideOpen, setOverrideOpen]           = useState(false)
+  const [overrideDate, setOverrideDate]           = useState('')
+  const [overrideReasonSelect, setOverrideReasonSelect] = useState('')
+  const [overrideReasonOther, setOverrideReasonOther]   = useState('')
+  const [overrideConfirmedLong, setOverrideConfirmedLong] = useState(false)
+
   const [vf, setVf] = useState({
     right_fixation: '', right_following: '', right_csm: '',
     right_teller_acuity: '', right_vep: '',
@@ -518,12 +526,29 @@ export default function RecordExamPage() {
 
   const handleFieldChange = (key, value) => setFields(prev => ({ ...prev, [key]: value }))
 
+  const overrideReason = resolveReason(overrideReasonSelect, overrideReasonOther)
+  const overrideValidation = validateReviewDate(overrideDate)
+
   const handleSubmit = async e => {
     e.preventDefault()
     setError('')
     if (!fields.right_zone && !fields.left_zone) {
       setError('Please enter findings for at least one eye.')
       return
+    }
+    if (overrideOpen && overrideDate) {
+      if (overrideValidation.error) {
+        setError(overrideValidation.error)
+        return
+      }
+      if (!overrideReason) {
+        setError('Please choose a reason for overriding the review date.')
+        return
+      }
+      if (overrideValidation.warning && !overrideConfirmedLong) {
+        setError('Please confirm the review date is longer than the recommended interval.')
+        return
+      }
     }
     setSubmitting(true)
     try {
@@ -563,6 +588,8 @@ export default function RecordExamPage() {
         treatment_recommended: treatment || null, notes: notes || null,
         ...vfPayload,
         ...antPayload,
+        next_review_override_date: (overrideOpen && overrideDate) ? overrideDate : null,
+        next_review_override_reason: (overrideOpen && overrideDate) ? overrideReason : null,
       })
       navigate(`/babies/${id}`)
     } catch (err) {
@@ -640,6 +667,81 @@ export default function RecordExamPage() {
             Auto-Scheduled Next Appointment
           </div>
           <SchedulingBanner fields={fields} examDate={examDate} />
+
+          {/* Manual override of the auto-scheduled date */}
+          {!overrideOpen ? (
+            <button
+              type="button"
+              onClick={() => {
+                const { worstZone, worstStage } = deriveWorstFinding(
+                  fields.right_zone, fields.right_stage, fields.right_plus,
+                  fields.left_zone,  fields.left_stage,  fields.left_plus,
+                )
+                const weeks = calcNextExamWeeks(worstZone, worstStage)
+                const prefill = (weeks && examDate)
+                  ? format(addWeeks(new Date(examDate + 'T00:00:00'), weeks), 'yyyy-MM-dd')
+                  : ''
+                setOverrideDate(prefill)
+                setOverrideReasonSelect('')
+                setOverrideReasonOther('')
+                setOverrideConfirmedLong(false)
+                setOverrideOpen(true)
+              }}
+              style={{ marginTop: '.5rem', background: 'none', border: 'none', color: 'var(--teal-600)', fontWeight: 600, fontSize: '.82rem', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+            >
+              Override this date
+            </button>
+          ) : (
+            <div style={{ marginTop: '.6rem', padding: '.75rem', background: 'var(--gray-50)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--gray-200)', display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
+              <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap' }}>
+                <div className="form-group" style={{ margin: 0, flex: 1, minWidth: 150 }}>
+                  <label>Override Review Date</label>
+                  <input
+                    type="date"
+                    value={overrideDate}
+                    onChange={e => { setOverrideDate(e.target.value); setOverrideConfirmedLong(false) }}
+                  />
+                </div>
+                <div className="form-group" style={{ margin: 0, flex: 1, minWidth: 170 }}>
+                  <label>Reason *</label>
+                  <select value={overrideReasonSelect} onChange={e => setOverrideReasonSelect(e.target.value)}>
+                    <option value="">Select a reason...</option>
+                    {REVIEW_DATE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                  {overrideReasonSelect === 'Other' && (
+                    <input
+                      type="text"
+                      style={{ marginTop: '.4rem' }}
+                      placeholder="Please specify the reason"
+                      value={overrideReasonOther}
+                      onChange={e => setOverrideReasonOther(e.target.value)}
+                    />
+                  )}
+                </div>
+              </div>
+              {overrideValidation.error && (
+                <div className="alert alert-error" style={{ fontSize: '.8rem', padding: '.4rem .65rem', margin: 0 }}>
+                  {overrideValidation.error}
+                </div>
+              )}
+              {!overrideValidation.error && overrideValidation.warning && (
+                <div style={{ fontSize: '.8rem', padding: '.5rem .65rem', borderRadius: 'var(--radius-sm)', background: 'var(--amber-50)', border: '1px solid var(--amber-500)', color: 'var(--amber-700, #b45309)' }}>
+                  <div style={{ marginBottom: '.4rem' }}>{overrideValidation.warning}</div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '.4rem', fontWeight: 600, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={overrideConfirmedLong} onChange={e => setOverrideConfirmedLong(e.target.checked)} />
+                    Yes, use this date
+                  </label>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => { setOverrideOpen(false); setOverrideDate(''); setOverrideReasonSelect(''); setOverrideReasonOther('') }}
+                style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: 'var(--gray-500)', fontSize: '.8rem', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+              >
+                Use auto-scheduled date instead
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Treatment & Notes */}

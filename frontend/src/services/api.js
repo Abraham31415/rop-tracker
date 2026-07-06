@@ -76,8 +76,8 @@ export const listAppointments = (babyId) => api.get(`/api/appointments/baby/${ba
 export const listAllAppointments = (params) => api.get('/api/appointments/', { params }).then(r => r.data)
 export const markAppointmentAttended = (appointmentId, notes) =>
   api.patch(`/api/appointments/${appointmentId}/attend`, { notes: notes || null }).then(r => r.data)
-export const rescheduleAppointment = (appointmentId, newDate, notes) =>
-  api.patch(`/api/appointments/${appointmentId}/reschedule`, { new_date: newDate, notes: notes || null }).then(r => r.data)
+export const rescheduleAppointment = (appointmentId, newDate, changeReason, notes) =>
+  api.patch(`/api/appointments/${appointmentId}/reschedule`, { new_date: newDate, change_reason: changeReason, notes: notes || null }).then(r => r.data)
 
 // ── Referrals ─────────────────────────────────────────────────────────────────
 export const listReferrals = (babyId) => api.get(`/api/referrals/baby/${babyId}`).then(r => r.data)

@@ -406,9 +406,18 @@ def research_export(
         for o in db.query(Outcome).filter(Outcome.baby_id.in_(baby_ids)).all():
             outcomes_map[str(o.baby_id)] = o
     exams_map: dict[str, list] = defaultdict(list)
+    all_exam_ids: list = []
     if baby_ids:
         for e in db.query(Exam).filter(Exam.baby_id.in_(baby_ids)).order_by(Exam.exam_date).all():
             exams_map[str(e.baby_id)].append(e)
+            all_exam_ids.append(e.id)
+    # Map each exam to the follow-up appointment it generated, so researchers can
+    # tell auto-scheduled review dates from manually overridden ones.
+    appt_by_exam: dict[str, Appointment] = {}
+    if all_exam_ids:
+        for a in db.query(Appointment).filter(Appointment.exam_id.in_(all_exam_ids)).all():
+            if a.exam_id is not None:
+                appt_by_exam[str(a.exam_id)] = a
     hospital_map = {str(h.id): h.name for h in db.query(Hospital).all()}
 
     output = io.StringIO()
@@ -423,7 +432,9 @@ def research_export(
         "treatment_type", "treatment_eye", "treatment_date",
         "visual_outcome", "discharge_status", "discharge_date",
         # Per-exam fields
-        "exam_number", "exam_date", "postnatal_age_days",
+        "exam_number", "exam_date",
+        "next_review_date_source", "next_review_date_change_reason",
+        "postnatal_age_days",
         "right_zone", "right_stage", "right_plus",
         "left_zone", "left_stage", "left_plus",
         "worst_zone", "worst_stage", "has_plus_disease",
@@ -471,12 +482,15 @@ def research_export(
         ]
 
         if not baby_exams:
-            writer.writerow(base + [""] * 25)
+            writer.writerow(base + [""] * 27)
         else:
             for enum_n, exam in enumerate(baby_exams, start=1):
+                appt = appt_by_exam.get(str(exam.id))
                 writer.writerow(base + [
                     enum_n,
                     exam.exam_date.isoformat() if exam.exam_date else "",
+                    (appt.date_source if appt else "") or "",
+                    (appt.date_change_reason if appt else "") or "",
                     exam.postnatal_age_days or "",
                     _ev(exam, 'right_zone'), _ev(exam, 'right_stage'), _ev(exam, 'right_plus'),
                     _ev(exam, 'left_zone'), _ev(exam, 'left_stage'), _ev(exam, 'left_plus'),

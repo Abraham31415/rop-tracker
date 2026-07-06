@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { listAllAppointments, markAppointmentAttended, rescheduleAppointment } from '../services/api'
 import { useTheme } from '../contexts/ThemeContext'
 import { getBabyDisplayName } from '../utils/babyName'
+import { REVIEW_DATE_REASONS, resolveReason } from '../utils/reviewDate'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const STATUS_META_LIGHT = {
@@ -92,16 +93,20 @@ function AttendDialog({ appt, onConfirm, onCancel, isPending }) {
 function ApptCard({ appt, canAct, isCentral, onAttend, onRescheduleSuccess, queryKey }) {
   const [rescheduleOpen, setRescheduleOpen] = useState(false)
   const [newDate, setNewDate] = useState('')
-  const [rescheduleNotes, setRescheduleNotes] = useState('')
+  const [reasonSelect, setReasonSelect] = useState('')
+  const [reasonOther, setReasonOther] = useState('')
   const qc = useQueryClient()
 
+  const reason = resolveReason(reasonSelect, reasonOther)
+
   const rescheduleMut = useMutation({
-    mutationFn: () => rescheduleAppointment(appt.id, newDate, rescheduleNotes),
+    mutationFn: () => rescheduleAppointment(appt.id, newDate, reason),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey })
       setRescheduleOpen(false)
       setNewDate('')
-      setRescheduleNotes('')
+      setReasonSelect('')
+      setReasonOther('')
     },
   })
 
@@ -249,16 +254,25 @@ function ApptCard({ appt, canAct, isCentral, onAttend, onRescheduleSuccess, quer
               />
             </div>
             <div className="form-group" style={{ margin: 0, flex: 2, minWidth: 160 }}>
-              <label className="form-label">
-                Reason <span style={{ fontWeight: 400, color: 'var(--gray-400)' }}>(optional)</span>
-              </label>
-              <input
-                type="text"
+              <label className="form-label">Reason *</label>
+              <select
                 className="form-control"
-                placeholder="e.g. Caregiver requested later date"
-                value={rescheduleNotes}
-                onChange={e => setRescheduleNotes(e.target.value)}
-              />
+                value={reasonSelect}
+                onChange={e => setReasonSelect(e.target.value)}
+              >
+                <option value="">Select a reason...</option>
+                {REVIEW_DATE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+              {reasonSelect === 'Other' && (
+                <input
+                  type="text"
+                  className="form-control"
+                  style={{ marginTop: '.4rem' }}
+                  placeholder="Please specify the reason"
+                  value={reasonOther}
+                  onChange={e => setReasonOther(e.target.value)}
+                />
+              )}
             </div>
           </div>
           {rescheduleMut.error && (
@@ -273,7 +287,7 @@ function ApptCard({ appt, canAct, isCentral, onAttend, onRescheduleSuccess, quer
             <button
               className="btn btn-primary btn-sm"
               onClick={() => rescheduleMut.mutate()}
-              disabled={!newDate || rescheduleMut.isPending}
+              disabled={!newDate || !reason || rescheduleMut.isPending}
             >
               {rescheduleMut.isPending ? 'Saving...' : 'Confirm Reschedule'}
             </button>

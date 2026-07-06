@@ -12,8 +12,11 @@ from app.auth.jwt import get_current_user
 from app.database import get_db
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.baby import Baby, BabyStatus
+from app.models.contact_log import ContactLog, ContactLogType
 from app.models.hospital import Hospital
+from app.models.reminder import Reminder, ReminderTrigger
 from app.models.user import User, UserRole
+from app.utils.audit import write_audit
 
 router = APIRouter(prefix="/api/appointments", tags=["appointments"])
 
@@ -39,6 +42,9 @@ class AppointmentOut(BaseModel):
     missed_at: Optional[str]
     ltfu_at: Optional[str]
     notes: Optional[str]
+    date_source: str
+    date_change_reason: Optional[str]
+    date_changed_at: Optional[str]
     created_at: str
 
     model_config = {"from_attributes": True}
@@ -69,6 +75,7 @@ class AttendPayload(BaseModel):
 
 class ReschedulePayload(BaseModel):
     new_date: date
+    change_reason: str
     notes: Optional[str] = None
 
 
@@ -85,6 +92,9 @@ def _appt_to_out(appt: Appointment) -> AppointmentOut:
         missed_at=_fmt(appt.missed_at),
         ltfu_at=_fmt(appt.ltfu_at),
         notes=appt.notes,
+        date_source=appt.date_source or "auto",
+        date_change_reason=appt.date_change_reason,
+        date_changed_at=_fmt(appt.date_changed_at),
         created_at=_fmt(appt.created_at),
     )
 
@@ -166,9 +176,54 @@ def reschedule_appointment(
     if appt.status != AppointmentStatus.SCHEDULED:
         raise HTTPException(status_code=409, detail="Only scheduled appointments can be rescheduled")
 
+    if payload.new_date < date.today():
+        raise HTTPException(status_code=400, detail="Review date cannot be in the past")
+
+    old_date = appt.due_date
+    now = datetime.now(timezone.utc)
+
     appt.due_date = payload.new_date
+    appt.date_source = "manual"
+    appt.date_change_reason = payload.change_reason
+    appt.date_changed_at = now
+    appt.date_changed_by_id = current_user.id
     if payload.notes:
         appt.notes = payload.notes
+
+    # Cancel this appointment's already-sent T-3 / T-1 reminders so the scheduler
+    # re-sends them relative to the new date (reminders are keyed by appt+trigger,
+    # not by date, so a stale SENT row would otherwise suppress the new one).
+    db.query(Reminder).filter(
+        Reminder.appointment_id == appt.id,
+        Reminder.trigger.in_([ReminderTrigger.T_MINUS_3, ReminderTrigger.T_MINUS_1]),
+    ).delete(synchronize_session=False)
+
+    write_audit(
+        db,
+        user_id=current_user.id,
+        user_name=current_user.full_name,
+        user_role=current_user.role.value,
+        action_type="RESCHEDULE",
+        entity_type="Appointment",
+        entity_id=str(appt.id),
+        details={
+            "baby_id": str(appt.baby_id),
+            "old_date": old_date.isoformat() if old_date else None,
+            "new_date": payload.new_date.isoformat(),
+            "reason": payload.change_reason,
+        },
+    )
+
+    log = ContactLog(
+        baby_id=appt.baby_id,
+        created_by_id=current_user.id,
+        log_type=ContactLogType.NOTE,
+        message=(
+            f"Review date changed from {old_date.isoformat()} to {payload.new_date.isoformat()} "
+            f"by {current_user.full_name}. Reason: {payload.change_reason}"
+        ),
+    )
+    db.add(log)
 
     db.commit()
     db.refresh(appt)

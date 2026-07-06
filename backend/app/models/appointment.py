@@ -1,7 +1,7 @@
 from __future__ import annotations
 import uuid
 import enum
-from sqlalchemy import Column, Date, DateTime, ForeignKey, Enum, Text
+from sqlalchemy import Column, Date, DateTime, ForeignKey, Enum, Text, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -32,6 +32,12 @@ class Appointment(Base):
 
     coordinator_alerted = Column(DateTime(timezone=True), nullable=True)
     notes = Column(Text, nullable=True)
+
+    # Whether due_date was auto-scheduled from findings or manually overridden.
+    date_source = Column(String, nullable=False, default="auto")  # "auto" | "manual"
+    date_change_reason = Column(Text, nullable=True)
+    date_changed_at = Column(DateTime(timezone=True), nullable=True)
+    date_changed_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
