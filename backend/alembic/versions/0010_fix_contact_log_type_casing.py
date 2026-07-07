@@ -10,6 +10,12 @@ convention used throughout app/models — stores the Python enum's
 UPPERCASE member name. This mismatch made any write of
 ContactLogType.CAREGIVER_EDIT (and friends) fail with
 "invalid input value for enum contact_log_type".
+
+The underlying Postgres enum type's name isn't assumed to be literally
+"contact_log_type": some environments have it as SQLAlchemy's
+auto-derived "contactlogtype" (no underscore) instead, depending on how
+the table was originally created. This looks up the real type name from
+the column itself rather than hardcoding it, so it works either way.
 """
 from alembic import op
 
@@ -27,11 +33,40 @@ _RENAMES = [
 ]
 
 
+def _enum_type_name():
+    conn = op.get_bind()
+    result = conn.exec_driver_sql(
+        "SELECT udt_name FROM information_schema.columns "
+        "WHERE table_name = 'contact_logs' AND column_name = 'log_type'"
+    ).scalar()
+    if not result:
+        raise RuntimeError("Could not find contact_logs.log_type column to determine its enum type name")
+    return result
+
+
+def _existing_labels(type_name):
+    conn = op.get_bind()
+    rows = conn.exec_driver_sql(
+        "SELECT e.enumlabel FROM pg_enum e JOIN pg_type t ON e.enumtypid = t.oid WHERE t.typname = %(name)s",
+        {"name": type_name},
+    ).fetchall()
+    return {r[0] for r in rows}
+
+
 def upgrade():
+    type_name = _enum_type_name()
+    labels = _existing_labels(type_name)
     for old, new in _RENAMES:
-        op.execute(f"ALTER TYPE contact_log_type RENAME VALUE '{old}' TO '{new}'")
+        # Some environments' tables were seeded with the uppercase labels already
+        # (e.g. via a direct create_all() using the current model), so there's
+        # nothing to rename there - only touch labels that are still lowercase.
+        if old in labels:
+            op.execute(f'ALTER TYPE "{type_name}" RENAME VALUE \'{old}\' TO \'{new}\'')
 
 
 def downgrade():
+    type_name = _enum_type_name()
+    labels = _existing_labels(type_name)
     for old, new in _RENAMES:
-        op.execute(f"ALTER TYPE contact_log_type RENAME VALUE '{new}' TO '{old}'")
+        if new in labels:
+            op.execute(f'ALTER TYPE "{type_name}" RENAME VALUE \'{new}\' TO \'{old}\'')
