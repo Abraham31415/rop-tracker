@@ -127,6 +127,7 @@ export const sendTestSms = (phone) => api.post('/api/reminders/test-sms', null, 
 // ── Analytics (central coordinator) ──────────────────────────────────────────
 export const getScreeningVolume = (params) => api.get('/api/analytics/screening-volume', { params }).then(r => r.data)
 export const getLtfuRate        = (params) => api.get('/api/analytics/ltfu-rate', { params }).then(r => r.data)
+export const getLtfuSummary     = (params) => api.get('/api/analytics/ltfu-summary', { params }).then(r => r.data)
 export const getAtRiskTrend     = (params) => api.get('/api/analytics/at-risk-trend', { params }).then(r => r.data)
 export const getAtRiskBabies    = (params) => api.get('/api/analytics/at-risk-babies', { params }).then(r => r.data)
 export const getLtfuBabies      = (params) => api.get('/api/analytics/ltfu-babies', { params }).then(r => r.data)

@@ -27,6 +27,14 @@ from app.models.outcome import Outcome, TreatmentType, VisualOutcome, DischargeS
 from app.models.reminder import Reminder, ReminderStatus
 from app.models.user import User, UserRole
 from app.services.scheduling import calculate_next_exam_weeks
+from app.services.followup_status import (
+    followup_breakdown,
+    all_review_episodes,
+    ltfu_window_summary,
+    LTFU as FOLLOWUP_LTFU,
+    LATE as FOLLOWUP_LATE,
+    IN_FOLLOWUP as FOLLOWUP_IN_FOLLOWUP,
+)
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 
@@ -187,16 +195,29 @@ def screening_volume(
     q = db.query(Baby)
     if hospital_id:
         q = q.filter(Baby.hospital_id == hospital_id)
-    if from_date:
-        q = q.filter(Baby.enrolled_at >= datetime(from_date.year, from_date.month, from_date.day, tzinfo=timezone.utc))
-    if to_date:
-        q = q.filter(Baby.enrolled_at <= datetime(to_date.year, to_date.month, to_date.day, 23, 59, 59, tzinfo=timezone.utc))
+    babies = q.all()
+    baby_ids = [b.id for b in babies]
+
+    # Each baby enters screening on its first exam date. enrolled_at is unreliable for
+    # historical imports (it holds the single bulk-import timestamp, which would collapse
+    # every imported baby into one bucket), so bucket by first-exam month and only fall
+    # back to enrolled_at for babies not yet examined.
+    first_exam: dict = {}
+    if baby_ids:
+        for e in db.query(Exam).filter(Exam.baby_id.in_(baby_ids)).order_by(Exam.exam_date).all():
+            if e.exam_date and e.baby_id not in first_exam:
+                first_exam[e.baby_id] = e.exam_date
 
     counts: dict[str, dict] = {}
-    for baby in q.all():
-        if not baby.enrolled_at:
+    for baby in babies:
+        entered = first_exam.get(baby.id) or (baby.enrolled_at.date() if baby.enrolled_at else None)
+        if not entered:
             continue
-        key, label = _period_key(baby.enrolled_at.date(), group_by)
+        if from_date and entered < from_date:
+            continue
+        if to_date and entered > to_date:
+            continue
+        key, label = _period_key(entered, group_by)
         if key not in counts:
             counts[key] = {"period": key, "label": label, "count": 0}
         counts[key]["count"] += 1
@@ -215,32 +236,69 @@ def ltfu_rate(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    """Programme-wide LTFU rate (headline KPI) plus a per-period trend series.
+
+    The headline ltfu_rate/counts/eligible are a live snapshot from the per-baby
+    six-tier classification (see app.services.followup_status), one row per baby -
+    matching the Dashboard and LTFU deep-dive.
+
+    The per-period "data" trend is built from *every* resolved review episode in each
+    baby's history (all_review_episodes), not from each baby's single current status.
+    Bucketing by current-status-only would make nearly every past period read ~100%
+    LTFU, since any review whose due date has passed and was never fulfilled is, by
+    construction, already past the 14-day grace window by "today" - that's a trivial
+    result of comparing an old date to today, not a real historical rate.
+    """
     _require_central(user)
 
-    q = db.query(Appointment)
-    baby_ids = _hospital_baby_ids(db, hospital_id)
-    if baby_ids is not None:
-        q = q.filter(Appointment.baby_id.in_(baby_ids))
-    if from_date:
-        q = q.filter(Appointment.due_date >= from_date)
-    if to_date:
-        q = q.filter(Appointment.due_date <= to_date)
+    breakdown = followup_breakdown(db, hospital_id)
 
+    episodes = all_review_episodes(db, hospital_id)
     periods: dict[str, dict] = {}
-    for appt in q.all():
-        if not appt.due_date:
+    for ep in episodes:
+        if ep["outcome"] == "pending":
             continue
-        key, label = _period_key(appt.due_date, group_by)
-        if key not in periods:
-            periods[key] = {"period": key, "label": label, "total": 0, "ltfu_count": 0, "rate": 0.0}
-        periods[key]["total"] += 1
-        if appt.status in (AppointmentStatus.MISSED, AppointmentStatus.LTFU):
-            periods[key]["ltfu_count"] += 1
+        review = ep["review_date"]
+        if from_date and review < from_date:
+            continue
+        if to_date and review > to_date:
+            continue
+        key, label = _period_key(review, group_by)
+        p = periods.setdefault(key, {"period": key, "label": label, "total": 0, "ltfu_count": 0, "rate": 0.0})
+        p["total"] += 1
+        if ep["outcome"] == "missed":
+            p["ltfu_count"] += 1
 
     for p in periods.values():
         p["rate"] = round(p["ltfu_count"] / p["total"] * 100, 1) if p["total"] else 0.0
 
-    return {"data": sorted(periods.values(), key=lambda x: x["period"])}
+    return {
+        "data": sorted(periods.values(), key=lambda x: x["period"]),
+        "ltfu_rate": breakdown["ltfu_rate"],
+        "eligible": breakdown["eligible"],
+        "counts": breakdown["counts"],
+    }
+
+
+# ── LTFU window summary (academic reporting) ──────────────────────────────────
+
+@router.get("/ltfu-summary")
+def ltfu_summary(
+    from_date: date,
+    to_date: date,
+    hospital_id: Optional[UUID] = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Fixed, reproducible LTFU summary for a closed date window, for academic reporting.
+
+    from_date and to_date are required (unlike the live snapshots). Every scheduled
+    review due in the window is assessed as-of to_date, so the same range always returns
+    the same numbers."""
+    _require_central(user)
+    if from_date > to_date:
+        raise HTTPException(status_code=400, detail="from_date must be on or before to_date")
+    return ltfu_window_summary(db, from_date, to_date, hospital_id)
 
 
 # ── At-risk trend ─────────────────────────────────────────────────────────────
@@ -451,11 +509,16 @@ def kpi_extra(
         if examined_baby_ids else 0.0
     )
 
+    # Age (in days) at first screening exam. Measured from date_of_birth rather than
+    # enrolled_at: enrolled_at holds the bulk-import timestamp for historical babies,
+    # which sits *after* their exam dates and produced a nonsensical negative average.
     gaps = []
     for b in babies:
         exams = exams_by_baby.get(b.id)
-        if exams and exams[0].exam_date and b.enrolled_at:
-            gaps.append((exams[0].exam_date - b.enrolled_at.date()).days)
+        if exams and exams[0].exam_date and b.date_of_birth:
+            delta = (exams[0].exam_date - b.date_of_birth).days
+            if delta >= 0:
+                gaps.append(delta)
     avg_days_to_first_exam = round(sum(gaps) / len(gaps), 1) if gaps else None
 
     return {
@@ -597,55 +660,36 @@ def ltfu_deep_dive(
 ):
     _require_central(user)
 
-    baby_ids = _hospital_baby_ids(db, hospital_id)
+    # Derived from the per-baby six-tier follow-up classification, not appointment
+    # status flags. As-of-today snapshot: from_date/to_date are accepted for API
+    # compatibility but do not window a current-state classification.
+    breakdown = followup_breakdown(db, hospital_id)
+    entries = breakdown["entries"]
+    today = date.today()
 
-    appt_q = db.query(Appointment)
-    if baby_ids is not None:
-        appt_q = appt_q.filter(Appointment.baby_id.in_(baby_ids))
-    if from_date:
-        appt_q = appt_q.filter(Appointment.due_date >= from_date)
-    if to_date:
-        appt_q = appt_q.filter(Appointment.due_date <= to_date)
-    appts = appt_q.all()
+    ltfu_entries = [e for e in entries if e["tier"] == FOLLOWUP_LTFU]
+    late_entries = [e for e in entries if e["tier"] == FOLLOWUP_LATE]
+    total_episodes = len(ltfu_entries)
 
-    ltfu_appts = [a for a in appts if a.status == AppointmentStatus.LTFU]
-    total_episodes = len(ltfu_appts)
-
-    overdue_days = []
-    for a in ltfu_appts:
-        ref = a.ltfu_at.date() if a.ltfu_at else (a.missed_at.date() if a.missed_at else None)
-        if ref and a.due_date:
-            overdue_days.append((ref - a.due_date).days)
+    overdue_days = [
+        (today - e["next_review"]).days for e in ltfu_entries if e["next_review"]
+    ]
     median_days_overdue = round(statistics.median(overdue_days), 1) if overdue_days else None
 
-    # Recovery: babies with an LTFU appt who later have an ATTENDED appt
-    ltfu_baby_dates: dict = {}
-    for a in ltfu_appts:
-        if a.due_date and (a.baby_id not in ltfu_baby_dates or a.due_date < ltfu_baby_dates[a.baby_id]):
-            ltfu_baby_dates[a.baby_id] = a.due_date
-    recovered = 0
-    if ltfu_baby_dates:
-        attended = (
-            db.query(Appointment)
-            .filter(Appointment.baby_id.in_(list(ltfu_baby_dates.keys())), Appointment.status == AppointmentStatus.ATTENDED)
-            .all()
-        )
-        recovered_ids = {
-            a.baby_id for a in attended
-            if a.due_date and a.due_date > ltfu_baby_dates.get(a.baby_id, date.max)
-        }
-        recovered = len(recovered_ids)
-    recovery_rate = round(recovered / len(ltfu_baby_dates) * 100, 1) if ltfu_baby_dates else 0.0
+    # Recovery: of babies who fell overdue, how many eventually returned (late attenders)
+    # vs. remained lost. late / (late + ltfu).
+    recovery_denom = len(ltfu_entries) + len(late_entries)
+    recovery_rate = round(len(late_entries) / recovery_denom * 100, 1) if recovery_denom else 0.0
 
-    # By hospital
+    # By hospital: LTFU rate among babies engaged in follow-up at each hospital.
     hospitals = {h.id: h.name for h in db.query(Hospital).all()}
-    baby_hosp = {b.id: b.hospital_id for b in db.query(Baby.id, Baby.hospital_id).all()}
     by_hospital_counts: dict = {}
-    for a in appts:
-        hid = baby_hosp.get(a.baby_id)
-        row = by_hospital_counts.setdefault(hid, {"total": 0, "ltfu": 0})
+    for e in entries:
+        if e["tier"] not in FOLLOWUP_IN_FOLLOWUP:
+            continue
+        row = by_hospital_counts.setdefault(e["hospital_id"], {"total": 0, "ltfu": 0})
         row["total"] += 1
-        if a.status == AppointmentStatus.LTFU:
+        if e["tier"] == FOLLOWUP_LTFU:
             row["ltfu"] += 1
     by_hospital = [
         {
@@ -660,12 +704,14 @@ def ltfu_deep_dive(
     # By GA band
     baby_ga = {b.id: b.gestational_age_weeks for b in db.query(Baby.id, Baby.gestational_age_weeks).all()}
     band_counts = {b: {"total": 0, "ltfu": 0} for b in GA_BANDS}
-    for a in appts:
-        band = _ga_band(baby_ga.get(a.baby_id))
+    for e in entries:
+        if e["tier"] not in FOLLOWUP_IN_FOLLOWUP:
+            continue
+        band = _ga_band(baby_ga.get(e["baby_id"]))
         if not band:
             continue
         band_counts[band]["total"] += 1
-        if a.status == AppointmentStatus.LTFU:
+        if e["tier"] == FOLLOWUP_LTFU:
             band_counts[band]["ltfu"] += 1
     by_ga_band = [
         {
@@ -709,15 +755,25 @@ def adherence(
         appt_q = appt_q.filter(Appointment.due_date <= to_date)
     appts = appt_q.all()
 
-    # Over time (always monthly, regardless of the page's overall grouping)
+    # Over time (always monthly, regardless of the page's overall grouping).
+    # Adherence = returned within the grace window for a scheduled review, derived from
+    # review episodes rather than appointment status flags (which the historical import
+    # never set to MISSED/LTFU, previously pinning this line flat at 100%). Pending
+    # (unresolved) reviews are excluded.
+    episodes = all_review_episodes(db, hospital_id)
     periods: dict = {}
-    for a in appts:
-        if not a.due_date:
+    for ep in episodes:
+        if ep["outcome"] == "pending":
             continue
-        key, label = _period_key(a.due_date, "month")
+        review = ep["review_date"]
+        if from_date and review < from_date:
+            continue
+        if to_date and review > to_date:
+            continue
+        key, label = _period_key(review, "month")
         p = periods.setdefault(key, {"period": key, "label": label, "attended": 0, "total": 0})
         p["total"] += 1
-        if a.status == AppointmentStatus.ATTENDED:
+        if ep["outcome"] == "attended":
             p["attended"] += 1
     over_time = [
         {"period": p["period"], "label": p["label"], "rate": round(p["attended"] / p["total"] * 100, 1) if p["total"] else 0.0}
@@ -1217,8 +1273,10 @@ def hospital_comparison(
                     exam_count += 1
                 if e.created_at and (last_activity is None or e.created_at > last_activity):
                     last_activity = e.created_at
-            if exams and exams[0].exam_date and b.enrolled_at:
-                gaps.append((exams[0].exam_date - b.enrolled_at.date()).days)
+            if exams and exams[0].exam_date and b.date_of_birth:
+                delta = (exams[0].exam_date - b.date_of_birth).days
+                if delta >= 0:
+                    gaps.append(delta)
         avg_days_to_first_exam = round(sum(gaps) / len(gaps), 1) if gaps else None
 
         hospital_appts = [a for b in hbabies for a in appts_by_baby.get(b.id, []) if a.due_date and in_period(a.due_date)]

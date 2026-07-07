@@ -13,6 +13,7 @@ import {
 import {
   getScreeningVolume,
   getLtfuRate,
+  getLtfuSummary,
   getAtRiskTrend,
   getAtRiskBabies,
   getLtfuBabies,
@@ -72,6 +73,13 @@ export default function AnalyticsPage() {
   const [ltfuPeriod, setLtfuPeriod] = useState(null)  // { from, to } for LTFU drill-down
   const [hospitalId, setHospitalId] = useState(null)  // set by clicking a row in Hospital Comparison
   const [exporting, setExporting] = useState(false)
+
+  // Custom-range LTFU summary export (academic reporting)
+  const [summaryOpen, setSummaryOpen] = useState(false)
+  const [sumFrom, setSumFrom] = useState(() => daysAgo(180))
+  const [sumTo, setSumTo]     = useState(() => today())
+  const [summaryBusy, setSummaryBusy] = useState(false)
+  const [summaryError, setSummaryError] = useState(null)
 
   const tf = TIMEFRAMES.find(t => t.key === tfKey)
   const fromDate  = tf.from()
@@ -147,9 +155,9 @@ export default function AnalyticsPage() {
 
   // ── Derived stat values ────────────────────────────────────────────────────
   const totalScreened  = volData?.data?.reduce((s, d) => s + d.count, 0) ?? null
-  const avgLtfuRate    = ltfuData?.data?.length
-    ? (ltfuData.data.reduce((s, d) => s + d.rate, 0) / ltfuData.data.length).toFixed(1)
-    : null
+  // Programme-wide LTFU rate from the per-baby six-tier classification (backend), not
+  // an average of per-period appointment rates.
+  const avgLtfuRate    = ltfuData?.ltfu_rate ?? null
   const currentAtRisk  = riskData?.current_count ?? null
 
   const modalTitle = modal === 'ltfu'
@@ -176,6 +184,61 @@ export default function AnalyticsPage() {
     }
   }
 
+  const handleExportLtfuSummary = async () => {
+    setSummaryBusy(true)
+    setSummaryError(null)
+    try {
+      const s = await getLtfuSummary({
+        from_date: sumFrom,
+        to_date: sumTo,
+        ...(hospitalId ? { hospital_id: hospitalId } : {}),
+      })
+      const pct = (v) => (v == null ? 'n/a' : `${v}%`)
+      const rows = [
+        ['ROP Programme - LTFU Summary (academic reporting)'],
+        ['Scope', hospitalName || 'All hospitals (network-wide)'],
+        ['Window (from)', s.from_date],
+        ['Window (to)', s.to_date],
+        ['Assessed as of', s.to_date],
+        ['Definition', 'LTFU = scheduled review overdue >14 days with no return, assessed at window end'],
+        [],
+        ['Metric', 'Value'],
+        ['Scheduled reviews due in window', s.reviews_due],
+        ['Resolved (attended + late + missed)', s.resolved],
+        ['Attended (within 14-day grace)', s.attended],
+        ['Late (returned >14 days after)', s.late],
+        ['Missed / LTFU', s.missed_ltfu],
+        ['Pending (unresolved at window end, excluded from rate)', s.pending],
+        ['LTFU rate', pct(s.ltfu_rate)],
+        ['Attendance rate', pct(s.attendance_rate)],
+        [],
+        ['Per hospital', '', '', '', '', '', ''],
+        ['Hospital', 'Reviews due', 'Resolved', 'Attended', 'Late', 'Missed/LTFU', 'Pending', 'LTFU rate'],
+        ...s.by_hospital.map(h => [
+          h.hospital_name, h.reviews_due, h.resolved, h.attended, h.late, h.missed_ltfu, h.pending, pct(h.ltfu_rate),
+        ]),
+      ]
+      const esc = (c) => {
+        const v = c == null ? '' : String(c)
+        return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
+      }
+      const csv = rows.map(r => r.map(esc).join(',')).join('\r\n')
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `ltfu-summary_${s.from_date}_to_${s.to_date}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setSummaryError(err?.response?.data?.detail || 'Could not generate the summary. Please try again.')
+    } finally {
+      setSummaryBusy(false)
+    }
+  }
+
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto' }}>
       {/* Header */}
@@ -186,10 +249,48 @@ export default function AnalyticsPage() {
             Network-wide trends for the selected period
           </p>
         </div>
-        <button className="btn btn-secondary btn-sm" onClick={handleExportPdf} disabled={exporting}>
-          {exporting ? 'Exporting…' : '⬇ Export PDF Report'}
-        </button>
+        <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary btn-sm" onClick={() => setSummaryOpen(o => !o)}>
+            ⬇ Export LTFU Summary
+          </button>
+          <button className="btn btn-secondary btn-sm" onClick={handleExportPdf} disabled={exporting}>
+            {exporting ? 'Exporting…' : '⬇ Export PDF Report'}
+          </button>
+        </div>
       </div>
+
+      {/* Custom-range LTFU summary export (academic reporting) */}
+      {summaryOpen && (
+        <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem 1.25rem' }}>
+          <div style={{ fontWeight: 700, color: 'var(--gray-800)', marginBottom: '.35rem' }}>
+            LTFU Summary for a fixed date range
+          </div>
+          <p style={{ fontSize: '.8rem', color: 'var(--gray-500)', margin: '0 0 .85rem' }}>
+            Computes the LTFU rate strictly within the window, assessed as of the end date, so the
+            numbers are reproducible for reporting. Downloads a CSV.
+            {hospitalName ? ` Scoped to ${hospitalName}.` : ' Network-wide.'}
+          </p>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <label style={{ fontSize: '.78rem', color: 'var(--gray-600)', fontWeight: 600 }}>
+              From
+              <input type="date" value={sumFrom} max={sumTo} onChange={e => setSumFrom(e.target.value)}
+                style={{ display: 'block', marginTop: '.25rem', padding: '.4rem .5rem', border: '1.5px solid var(--gray-200)', borderRadius: 'var(--radius)', fontSize: '.82rem' }} />
+            </label>
+            <label style={{ fontSize: '.78rem', color: 'var(--gray-600)', fontWeight: 600 }}>
+              To
+              <input type="date" value={sumTo} min={sumFrom} onChange={e => setSumTo(e.target.value)}
+                style={{ display: 'block', marginTop: '.25rem', padding: '.4rem .5rem', border: '1.5px solid var(--gray-200)', borderRadius: 'var(--radius)', fontSize: '.82rem' }} />
+            </label>
+            <button className="btn btn-primary btn-sm" onClick={handleExportLtfuSummary}
+              disabled={summaryBusy || !sumFrom || !sumTo || sumFrom > sumTo}>
+              {summaryBusy ? 'Generating…' : 'Download CSV'}
+            </button>
+          </div>
+          {summaryError && (
+            <p style={{ fontSize: '.8rem', color: 'var(--red-600)', margin: '.6rem 0 0' }}>{summaryError}</p>
+          )}
+        </div>
+      )}
 
       {/* Timeframe selector + hospital filter chip */}
       <div style={{ display: 'flex', gap: '.4rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -240,7 +341,7 @@ export default function AnalyticsPage() {
         <StatCard
           value={ltfuLoading ? '…' : (avgLtfuRate != null ? `${avgLtfuRate}%` : null)}
           label="Avg LTFU Rate"
-          sub="of appointments missed"
+          sub="of babies in follow-up"
           color="var(--red-600)"
           icon="⚠"
         />
@@ -278,7 +379,7 @@ export default function AnalyticsPage() {
         <StatCard
           value={kpiLoading ? '…' : (kpiExtra?.avg_days_to_first_exam != null ? `${kpiExtra.avg_days_to_first_exam}d` : null)}
           label="Avg Days to First Exam"
-          sub="from enrollment"
+          sub="age at first screening"
           color="var(--gray-600)"
           icon="📅"
         />

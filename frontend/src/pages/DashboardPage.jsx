@@ -7,23 +7,6 @@ import NurseDashboard from './NurseDashboard'
 import OphthalmologistDashboard from './OphthalmologistDashboard'
 import { getBabyDisplayName } from '../utils/babyName'
 
-// ── Dummy data (dates computed relative to today so the demo never goes stale) ─
-function _d(offsetDays) {
-  const d = new Date()
-  d.setDate(d.getDate() + offsetDays)
-  return d.toISOString().slice(0, 10)
-}
-
-const DUMMY_BABIES = [
-  { id: '1', full_name: 'Baby Nakamya A.',  sex: 'female', date_of_birth: _d(-56), urgency: 'ltfu',      hospital_name: 'Mulago NRH',   next_due_date: _d(-10), days_until_due: -10, last_exam_date: _d(-24), last_zone: 'zone_ii',  last_stage: 'stage_2', gestational_age_weeks: 28, birth_weight_grams: 1150, caregiver_name: 'Prossy Nakamya',  mtn_phone: '+256772000001', airtel_phone: null },
-  { id: '2', full_name: 'Baby Otim B.',     sex: 'male',   date_of_birth: _d(-69), urgency: 'ltfu',      hospital_name: 'Mulago NRH',   next_due_date: _d(-8),  days_until_due: -8,  last_exam_date: _d(-22), last_zone: 'zone_i',   last_stage: 'stage_1', gestational_age_weeks: 26, birth_weight_grams: 900,  caregiver_name: 'David Otim',      mtn_phone: '+256772000002', airtel_phone: null },
-  { id: '3', full_name: 'Baby Tumusiime C.', sex: 'female', date_of_birth: _d(-49), urgency: 'due_today', hospital_name: 'Mulago NRH',   next_due_date: _d(0),   days_until_due: 0,   last_exam_date: _d(-14), last_zone: 'zone_ii',  last_stage: 'stage_1', gestational_age_weeks: 30, birth_weight_grams: 1380, caregiver_name: 'Rose Tumusiime',   mtn_phone: null,            airtel_phone: '+256752000003' },
-  { id: '4', full_name: 'Baby Okello D.',   sex: 'male',   date_of_birth: _d(-42), urgency: 'due_soon',  hospital_name: 'Mulago NRH',   next_due_date: _d(2),   days_until_due: 2,   last_exam_date: _d(-12), last_zone: 'zone_ii',  last_stage: 'stage_1', gestational_age_weeks: 29, birth_weight_grams: 1240, caregiver_name: 'Margaret Okello', mtn_phone: '+256772000004', airtel_phone: null },
-  { id: '5', full_name: 'Baby Namukasa E.', sex: 'female', date_of_birth: _d(-35), urgency: 'due_soon',  hospital_name: 'Kiruddu GH',   next_due_date: _d(1),   days_until_due: 1,   last_exam_date: _d(-13), last_zone: 'zone_iii', last_stage: 'no_rop',  gestational_age_weeks: 32, birth_weight_grams: 1550, caregiver_name: 'Fatuma Namukasa', mtn_phone: '+256772000005', airtel_phone: null },
-  { id: '6', full_name: 'Baby Ayebare F.',  sex: 'female', date_of_birth: _d(-28), urgency: 'on_track',  hospital_name: 'Mulago NRH',   next_due_date: _d(14),  days_until_due: 14,  last_exam_date: _d(-14), last_zone: 'zone_iii', last_stage: 'no_rop',  gestational_age_weeks: 31, birth_weight_grams: 1420, caregiver_name: 'Alice Ayebare',   mtn_phone: null,            airtel_phone: '+256752000006' },
-  { id: '7', full_name: 'Baby Wanyama G.',  sex: 'male',   date_of_birth: _d(-21), urgency: 'on_track',  hospital_name: 'Mbarara RRRH', next_due_date: _d(21),  days_until_due: 21,  last_exam_date: _d(-7),  last_zone: 'zone_iii', last_stage: 'no_rop',  gestational_age_weeks: 33, birth_weight_grams: 1700, caregiver_name: 'Peter Wanyama',   mtn_phone: '+256772000007', airtel_phone: null },
-]
-
 // ── Labels & helpers ──────────────────────────────────────────────────────────
 const ZONE_LABELS  = { zone_i: 'Zone I', zone_ii: 'Zone II', zone_iii: 'Zone III' }
 const STAGE_LABELS = { no_rop: 'No ROP', stage_1: 'Stage 1', stage_2: 'Stage 2', stage_3: 'Stage 3', stage_4: 'Stage 4', stage_5: 'Stage 5', immature: 'Immature' }
@@ -97,8 +80,8 @@ function BabyCard({ baby }) {
             </div>
           )}
           <div className="baby-card-sub">
-            {baby.sex === 'male' ? 'Male' : 'Female'}
-            &nbsp;·&nbsp; DOB {format(new Date(baby.date_of_birth + 'T00:00:00'), 'dd MMM yyyy')}
+            {baby.sex === 'male' ? 'Male' : baby.sex === 'female' ? 'Female' : 'Sex unknown'}
+            &nbsp;·&nbsp; DOB {baby.date_of_birth ? format(new Date(baby.date_of_birth + 'T00:00:00'), 'dd MMM yyyy') : 'unknown'}
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.3rem', flexShrink: 0 }}>
@@ -231,13 +214,12 @@ export default function DashboardPage() {
   if (user?.role === 'ophthalmologist') return <OphthalmologistDashboard />
   // hospital_coordinator and central_coordinator fall through to the full dashboard below
 
-  const { data: babies, isLoading, error } = useQuery({
+  const { data: babies, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['dashboard'],
     queryFn: getDashboard,
   })
 
-  const displayBabies = error ? DUMMY_BABIES : (babies || [])
-  const isUsingDummy  = !!error
+  const displayBabies = babies || []
 
   const grouped = {}
   URGENCY_GROUPS.forEach(g => { grouped[g.key] = [] })
@@ -273,16 +255,36 @@ export default function DashboardPage() {
           <p>{format(new Date(), 'EEEE, d MMMM yyyy')}</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem' }}>
-          {isUsingDummy && (
-            <span className="demo-notice" style={{ padding: '.35rem .9rem', fontSize: '.78rem' }}>
-              Demo data - API offline
-            </span>
-          )}
           <Link to="/enroll" className="btn btn-primary">+ Enroll Baby</Link>
         </div>
       </div>
 
+      {/* Error state - shown instead of any data when the dashboard fails to load */}
+      {error && (
+        <div className="card">
+          <div className="empty-state">
+            <div className="empty-state-icon">⚠️</div>
+            <p>Couldn't load the dashboard.</p>
+            <p style={{ fontSize: '.82rem', color: 'var(--gray-400)', marginTop: '-.25rem' }}>
+              {error?.response?.status
+                ? `The server returned an error (${error.response.status}). Please try again.`
+                : 'The server could not be reached. Check your connection and try again.'}
+            </p>
+            <button
+              className="btn btn-primary btn-sm"
+              style={{ marginTop: '.25rem' }}
+              onClick={() => refetch()}
+              disabled={isFetching}
+            >
+              {isFetching ? 'Retrying…' : 'Retry'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Summary stat cards */}
+      {!error && (
+      <>
       <div className="urgency-grid">
         <UrgencyCard value={counts.ltfu}          label="Lost to Follow-Up" type="ltfu"      icon="!" to="/babies?urgency=ltfu" />
         <UrgencyCard value={counts.due_today}     label="Due Today"          type="due-today" icon="!" to="/babies?urgency=due_today" />
@@ -305,6 +307,8 @@ export default function DashboardPage() {
         URGENCY_GROUPS.map(group => (
           <UrgencySection key={group.key} group={group} babies={grouped[group.key]} />
         ))
+      )}
+      </>
       )}
     </div>
   )

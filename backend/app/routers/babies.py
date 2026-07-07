@@ -17,10 +17,31 @@ from app.schemas.baby import BabyCreate, BabyUpdate, BabyOut, BabyDashboardItem,
 from app.auth.jwt import get_current_user
 from app.utils.audit import write_audit
 from app.services.rop_id import generate_rop_id
+from app.services.followup_status import classify_baby, LTFU as FS_LTFU, EBNE as FS_EBNE
 from pydantic import BaseModel
 from typing import Optional
 
 router = APIRouter(prefix="/api/babies", tags=["babies"])
+
+
+def _urgency_from_tier(tier: str, next_review: date | None, today: date) -> str:
+    """Map a baby's six-tier follow-up classification to the dashboard's 4-value
+    urgency ("ltfu" | "due_today" | "due_soon" | "on_track"). Derived from the same
+    classifier as Analytics so the two views agree, and is immune to the scheduler's
+    Appointment.status transitions (SCHEDULED -> MISSED -> LTFU) which used to make
+    already-lost babies vanish from the "ltfu" bucket the moment their appointment
+    flipped to MISSED but before Baby.status caught up 48h later."""
+    if tier == FS_LTFU:
+        return "ltfu"
+    if tier == FS_EBNE:
+        return "due_today"  # never examined - needs immediate scheduling
+    if next_review is None:
+        return "on_track"
+    if next_review == today:
+        return "due_today"
+    if (next_review - today).days <= 2:
+        return "due_soon"
+    return "on_track"
 
 
 def _get_hospital_or_403(user: User, hospital_id: UUID | None, db: Session) -> UUID:
@@ -104,6 +125,7 @@ def search_babies_route(
 ):
     """Quick search by baby name, caregiver name, or phone number."""
     from app.models.appointment import Appointment, AppointmentStatus
+    from app.models.exam import Exam
     from datetime import date as _date
 
     like = f"%{q}%"
@@ -119,24 +141,27 @@ def search_babies_route(
 
     babies = query.limit(20).all()
     today = _date.today()
+
+    # Same six-tier classification as the dashboard (see _urgency_from_tier) rather
+    # than a raw Appointment.status == SCHEDULED lookup, so search results agree
+    # with the dashboard and Analytics instead of hiding LTFU babies as "on_track".
+    baby_ids = [b.id for b in babies]
+    exams_by_baby: dict = {}
+    appts_by_baby: dict = {}
+    if baby_ids:
+        for e in db.query(Exam).filter(Exam.baby_id.in_(baby_ids)).all():
+            exams_by_baby.setdefault(e.baby_id, []).append(e)
+        for a in db.query(Appointment).filter(Appointment.baby_id.in_(baby_ids)).all():
+            appts_by_baby.setdefault(a.baby_id, []).append(a)
+
     results = []
     for baby in babies:
-        next_appt = (
-            db.query(Appointment)
-            .filter(Appointment.baby_id == baby.id, Appointment.status == AppointmentStatus.SCHEDULED)
-            .order_by(Appointment.due_date).first()
+        tier, next_review = classify_baby(
+            baby.status, exams_by_baby.get(baby.id, []), appts_by_baby.get(baby.id, []), today,
         )
         last_exam = baby.exams[0] if baby.exams else None
-        due_date = next_appt.due_date if next_appt else None
-        days_until = (due_date - today).days if due_date else None
-        if baby.status == BabyStatus.LTFU:
-            urgency = "ltfu"
-        elif due_date == today:
-            urgency = "due_today"
-        elif days_until is not None and days_until <= 2:
-            urgency = "due_soon"
-        else:
-            urgency = "on_track"
+        due_date = next_review
+        urgency = _urgency_from_tier(tier, next_review, today)
         hospital = db.query(Hospital).filter(Hospital.id == baby.hospital_id).first()
         results.append({
             "id": str(baby.id),
@@ -311,33 +336,34 @@ def dashboard_urgency(
         ).all()
     }
 
+    # Bulk-fetch exams/appointments so urgency can be derived from the same
+    # six-tier classifier Analytics uses (see app.services.followup_status),
+    # instead of a raw Appointment.status == SCHEDULED lookup. That lookup went
+    # stale the moment the hourly scheduler flipped an overdue appointment to
+    # MISSED: the query would then find nothing, and the baby silently fell into
+    # "on_track" until Baby.status caught up to LTFU 48h later.
+    baby_ids = [b.id for b in babies]
+    exams_by_baby: dict = {}
+    appts_by_baby: dict = {}
+    if baby_ids:
+        for e in db.query(Exam).filter(Exam.baby_id.in_(baby_ids)).all():
+            exams_by_baby.setdefault(e.baby_id, []).append(e)
+        for a in db.query(Appointment).filter(Appointment.baby_id.in_(baby_ids)).all():
+            appts_by_baby.setdefault(a.baby_id, []).append(a)
+
     items = []
 
     for baby in babies:
-        next_appt = (
-            db.query(Appointment)
-            .filter(
-                Appointment.baby_id == baby.id,
-                Appointment.status == AppointmentStatus.SCHEDULED,
-            )
-            .order_by(Appointment.due_date)
-            .first()
+        tier, next_review = classify_baby(
+            baby.status, exams_by_baby.get(baby.id, []), appts_by_baby.get(baby.id, []), today,
         )
 
         last_exam = baby.exams[0] if baby.exams else None
         hospital = db.query(Hospital).filter(Hospital.id == baby.hospital_id).first()
 
-        due_date = next_appt.due_date if next_appt else None
+        due_date = next_review
         days_until = (due_date - today).days if due_date else None
-
-        if baby.status == BabyStatus.LTFU:
-            urgency = "ltfu"
-        elif due_date == today:
-            urgency = "due_today"
-        elif days_until is not None and days_until <= 2:
-            urgency = "due_soon"
-        else:
-            urgency = "on_track"
+        urgency = _urgency_from_tier(tier, next_review, today)
 
         items.append(BabyDashboardItem(
             id=baby.id,

@@ -21,12 +21,13 @@ def make_exam(db, baby, *, exam_date=None, treatment_recommended=None,
     return e
 
 
-def make_appointment(db, baby, *, due_date=None, status="scheduled"):
+def make_appointment(db, baby, *, due_date=None, status="scheduled", exam_id=None):
     from app.models.appointment import Appointment, AppointmentStatus
     a = Appointment(
         baby_id=baby.id,
         due_date=due_date or date(2024, 4, 1),
         status=AppointmentStatus(status),
+        exam_id=exam_id,
     )
     db.add(a)
     db.commit()
@@ -165,46 +166,112 @@ class TestLtfuRate:
         assert r.json()["data"] == []
 
     def test_rate_calculation(self, client, auth, central, hospital_a, db):
+        # A baby examined once, whose scheduled review (2024) is now long overdue with
+        # no later visit, is classified LTFU by the per-baby six-tier definition.
         baby = make_baby(db, hospital_a.id)
-        make_appointment(db, baby, due_date=date(2024, 5, 10), status="attended")
-        make_appointment(db, baby, due_date=date(2024, 5, 20), status="missed")
-        make_appointment(db, baby, due_date=date(2024, 5, 25), status="ltfu")
+        exam = make_exam(db, baby, exam_date=date(2024, 4, 1))
+        make_appointment(db, baby, due_date=date(2024, 5, 1), status="scheduled", exam_id=exam.id)
 
         r = client.get("/api/analytics/ltfu-rate",
                        headers=auth("central@test.com"),
                        params={"group_by": "month"})
-        data = r.json()["data"]
-        may = next((d for d in data if d["period"] == "2024-05"), None)
+        body = r.json()
+        assert body["counts"]["ltfu"] == 1
+        assert body["eligible"] == 1
+        assert body["ltfu_rate"] == 100.0
+        may = next((d for d in body["data"] if d["period"] == "2024-05"), None)
         assert may is not None
-        assert may["total"] == 3
-        assert may["ltfu_count"] == 2
-        assert may["rate"] == round(2 / 3 * 100, 1)
+        assert may["total"] == 1
+        assert may["ltfu_count"] == 1
+        assert may["rate"] == 100.0
 
-    def test_zero_rate_when_all_attended(self, client, auth, central, hospital_a, db):
+    def test_zero_rate_when_review_in_future(self, client, auth, central, hospital_a, db):
+        # Examined baby with a future review -> completed_followup, not LTFU.
         baby = make_baby(db, hospital_a.id)
-        make_appointment(db, baby, due_date=date(2024, 5, 1), status="attended")
-        make_appointment(db, baby, due_date=date(2024, 5, 15), status="attended")
+        exam = make_exam(db, baby, exam_date=date.today() - timedelta(days=10))
+        make_appointment(db, baby, due_date=date.today() + timedelta(days=30),
+                         status="scheduled", exam_id=exam.id)
 
         r = client.get("/api/analytics/ltfu-rate",
                        headers=auth("central@test.com"),
                        params={"group_by": "month"})
-        data = r.json()["data"]
-        may = next((d for d in data if d["period"] == "2024-05"), None)
-        assert may is not None
-        assert may["rate"] == 0.0
+        body = r.json()
+        assert body["counts"]["ltfu"] == 0
+        assert body["counts"]["completed_followup"] == 1
+        assert body["ltfu_rate"] == 0.0
+
+    def test_baby_without_exam_is_excluded(self, client, auth, central, hospital_a, db):
+        # A baby with an appointment but no exam is EBNE, not part of the LTFU cohort.
+        baby = make_baby(db, hospital_a.id)
+        make_appointment(db, baby, due_date=date(2024, 6, 1), status="scheduled")
+
+        r = client.get("/api/analytics/ltfu-rate",
+                       headers=auth("central@test.com"),
+                       params={"group_by": "month"})
+        body = r.json()
+        assert body["counts"]["ebne"] == 1
+        assert body["eligible"] == 0
+        assert body["ltfu_rate"] == 0.0
+        assert body["data"] == []
 
     def test_date_filter_excludes_outside_range(self, client, auth, central, hospital_a, db):
-        baby = make_baby(db, hospital_a.id)
-        make_appointment(db, baby, due_date=date(2024, 1, 1), status="missed")
-        make_appointment(db, baby, due_date=date(2024, 6, 1), status="missed")
+        # Two examined, overdue (LTFU) babies with reviews in different months; the
+        # per-period series honours the date window on the review date.
+        b1 = make_baby(db, hospital_a.id)
+        e1 = make_exam(db, b1, exam_date=date(2023, 12, 1))
+        make_appointment(db, b1, due_date=date(2024, 1, 1), status="scheduled", exam_id=e1.id)
+        b2 = make_baby(db, hospital_a.id)
+        e2 = make_exam(db, b2, exam_date=date(2024, 5, 1))
+        make_appointment(db, b2, due_date=date(2024, 6, 1), status="scheduled", exam_id=e2.id)
 
         r = client.get("/api/analytics/ltfu-rate",
                        headers=auth("central@test.com"),
                        params={"from_date": "2024-05-01", "to_date": "2024-07-01", "group_by": "month"})
-        data = r.json()["data"]
-        periods = [d["period"] for d in data]
+        periods = [d["period"] for d in r.json()["data"]]
         assert "2024-01" not in periods
         assert "2024-06" in periods
+
+
+class TestLtfuSummary:
+    def test_requires_date_range(self, client, auth, central):
+        r = client.get("/api/analytics/ltfu-summary", headers=auth("central@test.com"))
+        assert r.status_code == 422  # from_date/to_date are required query params
+
+    def test_rejects_inverted_range(self, client, auth, central):
+        r = client.get("/api/analytics/ltfu-summary", headers=auth("central@test.com"),
+                       params={"from_date": "2024-07-01", "to_date": "2024-01-01"})
+        assert r.status_code == 400
+
+    def test_window_rate_and_reproducible(self, client, auth, central, hospital_a, db):
+        # Missed review in-window (overdue >14d by to_date), attended review in-window,
+        # and a review outside the window that must be excluded.
+        b1 = make_baby(db, hospital_a.id)
+        e1 = make_exam(db, b1, exam_date=date(2024, 1, 5))
+        make_appointment(db, b1, due_date=date(2024, 2, 1), status="scheduled", exam_id=e1.id)  # missed
+
+        b2 = make_baby(db, hospital_a.id)
+        e2a = make_exam(db, b2, exam_date=date(2024, 1, 10))
+        make_appointment(db, b2, due_date=date(2024, 2, 10), status="attended", exam_id=e2a.id)  # review due
+        make_exam(db, b2, exam_date=date(2024, 2, 15))  # returned 5d after -> attended
+
+        b3 = make_baby(db, hospital_a.id)
+        e3 = make_exam(db, b3, exam_date=date(2024, 11, 1))
+        make_appointment(db, b3, due_date=date(2024, 12, 1), status="scheduled", exam_id=e3.id)  # outside window
+
+        params = {"from_date": "2024-01-01", "to_date": "2024-03-31"}
+        r = client.get("/api/analytics/ltfu-summary", headers=auth("central@test.com"), params=params)
+        assert r.status_code == 200
+        body = r.json()
+        assert body["reviews_due"] == 2      # b3's Dec review excluded
+        assert body["missed_ltfu"] == 1
+        assert body["attended"] == 1
+        assert body["resolved"] == 2
+        assert body["ltfu_rate"] == 50.0
+        assert body["attendance_rate"] == 50.0
+
+        # Same window must always return identical numbers (assessed as-of to_date).
+        r2 = client.get("/api/analytics/ltfu-summary", headers=auth("central@test.com"), params=params)
+        assert r2.json() == body
 
 
 # ── At-risk trend ─────────────────────────────────────────────────────────────

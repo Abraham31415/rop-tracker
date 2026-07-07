@@ -90,7 +90,7 @@ class BabyDashboardItem(BaseModel):
     rop_id: Optional[str] = None
     full_name: str
     sex: Optional[str] = None
-    date_of_birth: date
+    date_of_birth: Optional[date] = None  # unknown for some imported register babies
     gestational_age_weeks: Optional[float] = None
     birth_weight_grams: Optional[float] = None
     status: BabyStatus
