@@ -661,7 +661,7 @@ function GatewayTab() {
 function ThemePreview({ variant }) {
   const p = variant === 'dark'
     ? { bg: '#0F172A', side: '#0D1B2A', card: '#1E293B', border: '#334155', bar: '#1E293B' }
-    : { bg: '#F8FAFC', side: '#0F6E56', card: '#FFFFFF', border: '#E2E8F0', bar: '#FFFFFF' }
+    : { bg: '#F8FAFC', side: '#1A56DB', card: '#FFFFFF', border: '#E2E8F0', bar: '#FFFFFF' }
   return (
     <div style={{
       display: 'flex', height: 100, borderRadius: 6, overflow: 'hidden',

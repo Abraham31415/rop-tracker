@@ -3,15 +3,15 @@
 
 /* ── Design tokens ────────────────────────────────────────────────────────── */
 :root {
-  /* Teal primary */
-  --teal-900: #134e4a;
-  --teal-800: #115e59;
-  --teal-700: #0f766e;
-  --teal-600: #0d9488;
-  --teal-500: #14b8a6;
-  --teal-400: #2dd4bf;
-  --teal-100: #ccfbf1;
-  --teal-50:  #f0fdfa;
+  /* Blue primary */
+  --teal-900: #1e3a8a;
+  --teal-800: #1e40af;
+  --teal-700: #1344b8;
+  --teal-600: #1a56db;
+  --teal-500: #2563eb;
+  --teal-400: #93c5fd;
+  --teal-100: #dbeafe;
+  --teal-50:  #eff6ff;
 
   /* Semantic urgency */
   --red-700:   #b91c1c;
@@ -57,12 +57,12 @@
   --shadow:     0 4px 6px -1px rgba(0,0,0,.08), 0 2px 4px -1px rgba(0,0,0,.05);
   --shadow-md:  0 10px 15px -3px rgba(0,0,0,.09), 0 4px 6px -2px rgba(0,0,0,.05);
   --shadow-lg:  0 20px 25px -5px rgba(0,0,0,.1), 0 10px 10px -5px rgba(0,0,0,.04);
-  --shadow-teal:0 4px 14px rgba(13,148,136,.25);
+  --shadow-teal:0 4px 14px rgba(26,86,219,.25);
 
   /* Theme surface tokens (overridden per data-theme below) */
   --surface:        var(--white);
   --input-bg:       var(--white);
-  --sidebar-grad:   #0F6E56;
+  --sidebar-grad:   #1A56DB;
 }
 
 /* ── Dark theme ──────────────────────────────────────────────────────────────
@@ -94,7 +94,7 @@
   --red-50:   #2a1517;
   --amber-50: #2a2109;
   --green-50: #0e2417;
-  --teal-50:  #0c2421;
+  --teal-50:  #0c1930;
 }
 
 /* ── Dark theme: component-level overrides ──────────────────────────────────── */
@@ -126,8 +126,8 @@
 [data-theme="dark"] .btn-ghost:hover { background: #243044; color: #f1f5f9; }
 
 /* Links */
-[data-theme="dark"] a { color: #34d399; }
-[data-theme="dark"] a:hover { color: #6ee7b7; }
+[data-theme="dark"] a { color: #60a5fa; }
+[data-theme="dark"] a:hover { color: #93c5fd; }
 
 /* Input focus ring */
 [data-theme="dark"] .form-group input:focus,
@@ -136,7 +136,7 @@
 [data-theme="dark"] .form-input:focus,
 [data-theme="dark"] .filter-search:focus,
 [data-theme="dark"] .filter-select:focus {
-  border-color: #0f6e56; box-shadow: 0 0 0 3px rgba(15,110,86,.3);
+  border-color: #1a56db; box-shadow: 0 0 0 3px rgba(26,86,219,.3);
 }
 
 /* Status badges */
@@ -150,12 +150,12 @@
 [data-theme="dark"] .urgency-card.due-today { background: #3b2800; border: 1px solid #334155; border-left: 4px solid #f59e0b; color: #fcd34d; }
 [data-theme="dark"] .urgency-card.due-soon  { background: #2d2a00; border: 1px solid #334155; border-left: 4px solid #eab308; color: #fde047; }
 [data-theme="dark"] .urgency-card.on-track  { background: #0f2d1f; border: 1px solid #334155; border-left: 4px solid #22c55e; color: #4ade80; }
-[data-theme="dark"] .urgency-card.total     { background: #0a2420; border: 1px solid #334155; border-left: 4px solid #0f6e56; color: #34d399; }
+[data-theme="dark"] .urgency-card.total     { background: #0a1830; border: 1px solid #334155; border-left: 4px solid #1a56db; color: #93c5fd; }
 
 /* Alerts: subtler borders on dark */
 [data-theme="dark"] .alert-error   { border-color: #7f1d1d; }
 [data-theme="dark"] .alert-success { border-color: #14532d; }
-[data-theme="dark"] .alert-info    { border-color: #134e4a; }
+[data-theme="dark"] .alert-info    { border-color: #1e3a8a; }
 
 /* Spinner track */
 [data-theme="dark"] .spinner { border-color: #334155; border-top-color: var(--teal-500); }
@@ -175,8 +175,8 @@
 
 /* Chips: keep coloured text legible on the darkened soft tints */
 [data-theme="dark"] .notif-count-chip.notif-ltfu { color: #fca5a5; }
-[data-theme="dark"] .notif-count-chip.notif-due  { color: #5eead4; }
-[data-theme="dark"] .topbar-badge { color: #5eead4; border-color: #134e4a; }
+[data-theme="dark"] .notif-count-chip.notif-due  { color: #93c5fd; }
+[data-theme="dark"] .topbar-badge { color: #93c5fd; border-color: #1e3a8a; }
 
 /* Scrollbars */
 [data-theme="dark"] ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -201,7 +201,7 @@
 .theme-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
 .theme-card.active {
   border-color: var(--teal-600);
-  box-shadow: 0 0 0 3px rgba(15,110,86,.18);
+  box-shadow: 0 0 0 3px rgba(26,86,219,.18);
 }
 .theme-card-label {
   display: flex;
@@ -295,7 +295,7 @@ button, [role="button"] { touch-action: manipulation; }
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(45,212,191,.3);
+  box-shadow: 0 2px 8px rgba(147,197,253,.3);
 }
 .sidebar-logo-text { line-height: 1.2; }
 .sidebar-logo-title {
@@ -467,7 +467,7 @@ button, [role="button"] { touch-action: manipulation; }
   color: var(--white);
   box-shadow: var(--shadow-teal);
 }
-.btn-primary:hover:not(:disabled) { background: linear-gradient(135deg, var(--teal-700), var(--teal-800)); box-shadow: 0 4px 18px rgba(13,148,136,.35); transform: translateY(-1px); }
+.btn-primary:hover:not(:disabled) { background: linear-gradient(135deg, var(--teal-700), var(--teal-800)); box-shadow: 0 4px 18px rgba(26,86,219,.35); transform: translateY(-1px); }
 .btn-primary:active:not(:disabled) { transform: translateY(0); }
 
 .btn-secondary { background: var(--surface); color: var(--gray-700); border: 1px solid var(--gray-300); box-shadow: var(--shadow-xs); }
@@ -599,7 +599,7 @@ tbody tr.row-on_track { border-left: 4px solid var(--green-600); }
 .form-group textarea:focus {
   outline: none;
   border-color: var(--teal-500);
-  box-shadow: 0 0 0 3px rgba(20,184,166,.15);
+  box-shadow: 0 0 0 3px rgba(37,99,235,.15);
 }
 .form-group input::placeholder { color: var(--gray-400); }
 .form-group .error-msg { color: var(--red-600); font-size: .78rem; font-weight: 500; }
@@ -622,7 +622,7 @@ tbody tr.row-on_track { border-left: 4px solid var(--green-600); }
 .form-input:focus {
   outline: none;
   border-color: var(--teal-500);
-  box-shadow: 0 0 0 3px rgba(20,184,166,.15);
+  box-shadow: 0 0 0 3px rgba(37,99,235,.15);
 }
 .form-input::placeholder { color: var(--gray-400); }
 .form-error { color: var(--red-600); font-size: .82rem; font-weight: 500; }
@@ -683,7 +683,7 @@ tbody tr.row-on_track { border-left: 4px solid var(--green-600); }
   background: var(--teal-600);
   border-color: var(--teal-600);
   color: var(--white);
-  box-shadow: 0 2px 8px rgba(13,148,136,.25);
+  box-shadow: 0 2px 8px rgba(26,86,219,.25);
 }
 .risk-chip input { display: none; }
 
