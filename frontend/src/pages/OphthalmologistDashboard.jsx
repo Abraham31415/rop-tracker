@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { getBabyDisplayName } from '../utils/babyName'
 
 const DILATION_LABELS = {
-  dilated:          { label: 'Dilated', color: 'var(--teal-700,#1344b8)' },
+  dilated:          { label: 'Dilated', color: 'var(--teal-700,#2e6da4)' },
   not_dilated:      { label: 'Not dilated', color: 'var(--gray-500)' },
   dilation_refused: { label: 'Refused', color: 'var(--red-600,#dc2626)' },
 }

@@ -17,10 +17,10 @@ import {
 
 // ── Palette ──────────────────────────────────────────────────────────────────
 const C = {
-  teal:      [26, 86, 219],
-  tealDark:  [19, 68, 184],
-  tealLight: [219, 234, 254],
-  tealText:  [30, 64, 175],
+  teal:      [30, 58, 95],
+  tealDark:  [22, 45, 74],
+  tealLight: [214, 232, 245],
+  tealText:  [30, 58, 95],
   white:     [255, 255, 255],
   gray900:   [17, 24, 39],
   gray700:   [55, 65, 81],
@@ -80,7 +80,7 @@ function addVFSection(doc, exam, yStart) {
       head: [['Finding', 'Right Eye (OD)', 'Left Eye (OS)']],
       body: rows,
       styles: { fontSize: 8.5, cellPadding: 2.5 },
-      headStyles: { fillColor: [219, 234, 254], textColor: [30, 64, 175], fontStyle: 'bold' },
+      headStyles: { fillColor: [214, 232, 245], textColor: [30, 58, 95], fontStyle: 'bold' },
       alternateRowStyles: { fillColor: C.gray100 },
       columnStyles: { 0: { fontStyle: 'bold', textColor: C.gray500, cellWidth: 45 } },
     })
@@ -141,7 +141,7 @@ function setTxt(doc, rgb)  { doc.setTextColor(...rgb) }
 
 async function qrDataUrl(url) {
   try {
-    return await QRCode.toDataURL(url, { width: 200, margin: 1, color: { dark: '#1344b8', light: '#ffffff' } })
+    return await QRCode.toDataURL(url, { width: 200, margin: 1, color: { dark: '#2e6da4', light: '#ffffff' } })
   } catch { return null }
 }
 
@@ -202,7 +202,7 @@ export async function generatePopulationPDF(report) {
   doc.rect(0, 0, PW, 70, 'F')
 
   // Eye icon (nested circles in teal shades)
-  setFill(doc, [16, 66, 175])
+  setFill(doc, [14, 28, 48])
   doc.circle(PW / 2, 28, 18, 'F')
   setFill(doc, C.tealDark)
   doc.circle(PW / 2, 28, 8, 'F')

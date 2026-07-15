@@ -1145,7 +1145,7 @@ const DILATION_OPTIONS = [
   { value: 'dilation_refused', label: 'Dilation refused' },
 ]
 const DILATION_STYLE = {
-  dilated:          { bg: 'var(--teal-50,#eff6ff)', color: 'var(--teal-700,#1344b8)', label: 'Dilated - ready' },
+  dilated:          { bg: 'var(--teal-50,#eff4fa)', color: 'var(--teal-700,#2e6da4)', label: 'Dilated - ready' },
   not_dilated:      { bg: 'var(--gray-100)', color: 'var(--gray-500)', label: 'Not dilated' },
   dilation_refused: { bg: 'var(--red-50,#fef2f2)', color: 'var(--red-600,#dc2626)', label: 'Refused' },
 }
@@ -1633,7 +1633,7 @@ export default function BabyDetailPage() {
             background: 'none', border: 'none', cursor: 'pointer', padding: '.55rem 1.1rem',
             fontSize: '.87rem', fontWeight: 700,
             color: activeTab === tab.id ? 'var(--teal-700)' : 'var(--gray-500)',
-            borderBottom: activeTab === tab.id ? '2px solid var(--teal-600)' : '2px solid transparent',
+            borderBottom: activeTab === tab.id ? '2px solid var(--teal-700)' : '2px solid transparent',
             marginBottom: '-2px', transition: 'all .15s',
           }}>{tab.label}</button>
         ))}

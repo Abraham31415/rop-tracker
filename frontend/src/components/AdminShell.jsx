@@ -6,9 +6,9 @@ import { getAdminDashboard } from '../services/adminApi'
 
 const C = {
   bg:         '#0A0F1E',
-  sidebar:    '#0D1426',
+  sidebar:    '#0F1F33',
   cardBorder: '#1E3A5F',
-  teal:       '#1A56DB',
+  teal:       '#1E3A5F',
   amber:      '#F59E0B',
   blue:       '#3B82F6',
   textLabel:  '#64748B',
@@ -84,7 +84,7 @@ function NavItem({ to, label, Icon }) {
         display: 'flex', alignItems: 'center', gap: '.7rem',
         padding: '.6rem 1.4rem',
         color: isActive ? C.white : C.textMuted,
-        background: isActive ? 'rgba(26,86,219,.10)' : 'transparent',
+        background: isActive ? 'rgba(30,58,95,.18)' : 'transparent',
         textDecoration: 'none',
         fontSize: '.875rem',
         fontWeight: isActive ? 600 : 400,

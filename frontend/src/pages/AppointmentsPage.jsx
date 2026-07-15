@@ -375,7 +375,7 @@ export default function AppointmentsPage() {
             background: 'none', border: 'none', cursor: 'pointer',
             padding: '.55rem 1rem', fontSize: '.85rem', fontWeight: 700, whiteSpace: 'nowrap',
             color: statusTab === tab.id ? 'var(--teal-700)' : 'var(--gray-500)',
-            borderBottom: statusTab === tab.id ? '2px solid var(--teal-600)' : '2px solid transparent',
+            borderBottom: statusTab === tab.id ? '2px solid var(--teal-700)' : '2px solid transparent',
             marginBottom: '-2px', transition: 'all .15s',
           }}>
             {tab.label}

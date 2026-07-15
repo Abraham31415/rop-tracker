@@ -399,7 +399,7 @@ export default function ReportsPage() {
             style={{
               background: 'none', border: 'none', cursor: 'pointer', padding: '.6rem 1.2rem',
               fontSize: '.87rem', fontWeight: 700, color: activeTab === tab.id ? 'var(--teal-700)' : 'var(--gray-500)',
-              borderBottom: activeTab === tab.id ? '2px solid var(--teal-600)' : '2px solid transparent',
+              borderBottom: activeTab === tab.id ? '2px solid var(--teal-700)' : '2px solid transparent',
               marginBottom: '-2px', transition: 'all .15s',
             }}
           >

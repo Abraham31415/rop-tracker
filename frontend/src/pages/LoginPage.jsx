@@ -98,7 +98,7 @@ export default function LoginPage() {
           <div className="login-mobile-brand">
             <div style={{
               width: 48, height: 48,
-              background: 'linear-gradient(135deg, var(--teal-600), var(--teal-700))',
+              background: 'linear-gradient(135deg, var(--teal-600), var(--teal-900))',
               borderRadius: 12,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               marginBottom: '.75rem',

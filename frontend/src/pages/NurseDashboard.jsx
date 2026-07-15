@@ -13,7 +13,7 @@ const DILATION_OPTIONS = [
 ]
 
 const DILATION_STYLE = {
-  dilated:          { bg: 'var(--teal-50,#eff6ff)', color: 'var(--teal-700,#1344b8)', label: 'Dilated - ready' },
+  dilated:          { bg: 'var(--teal-50,#eff4fa)', color: 'var(--teal-700,#2e6da4)', label: 'Dilated - ready' },
   not_dilated:      { bg: 'var(--gray-100)', color: 'var(--gray-500)', label: 'Not dilated' },
   dilation_refused: { bg: 'var(--red-50,#fef2f2)', color: 'var(--red-600,#dc2626)', label: 'Refused' },
 }
@@ -117,7 +117,7 @@ function BabyRow({ baby }) {
         <div style={{ gridColumn: 'span 2' }}>
           <div className="baby-card-field-label">Screening Request</div>
           {activeRequest ? (
-            <div style={{ fontSize: '.82rem', color: activeRequest.status === 'claimed' ? 'var(--teal-700,#1344b8)' : 'var(--gray-500)' }}>
+            <div style={{ fontSize: '.82rem', color: activeRequest.status === 'claimed' ? 'var(--teal-700,#2e6da4)' : 'var(--gray-500)' }}>
               {activeRequest.status === 'pending' && 'Pending - waiting for ophthalmologist to claim'}
               {activeRequest.status === 'claimed' && `Claimed by Dr. ${activeRequest.claimed_by_name}`}
               {activeRequest.status === 'escalated' && 'Escalated to coordinator (no response in 24h)'}
