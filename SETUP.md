@@ -84,10 +84,10 @@ Open http://localhost:3000 in your browser.
 
 | Role                  | Email                          | Password    |
 |-----------------------|--------------------------------|-------------|
-| Central Coordinator   | central@rop.ug                 | password123 |
-| Hospital Coordinator  | coordinator.mulago@rop.ug      | password123 |
-| Ophthalmologist       | ophth.mulago@rop.ug            | password123 |
-| NICU Nurse            | nurse.mulago@rop.ug            | password123 |
+| Central Coordinator   | central@rop.ug                 | rop2024     |
+| Hospital Coordinator  | coordinator.mulago@rop.ug      | rop2024     |
+| Ophthalmologist       | ophth.mulago@rop.ug            | rop2024     |
+| NICU Nurse            | nurse.mulago@rop.ug            | rop2024     |
 
 ---
 

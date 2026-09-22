@@ -120,68 +120,68 @@ users_data = [
     # Central
     {"email": "central@rop.ug",
      "full_name": "Dr. Central Admin",
-     "password": "password123",
+     "password": "rop2024",
      "role": UserRole.CENTRAL_COORDINATOR,
      "hospital_id": None},
 
     # Hospital Coordinators
     {"email": "coordinator.mulago@rop.ug",
      "full_name": "Nurse Sarah Nakato",
-     "password": "password123",
+     "password": "rop2024",
      "role": UserRole.HOSPITAL_COORDINATOR,
      "hospital_id": mulago.id},
     {"email": "coordinator.kiruddu@rop.ug",
      "full_name": "Nurse Florence Nambi",
-     "password": "password123",
+     "password": "rop2024",
      "role": UserRole.HOSPITAL_COORDINATOR,
      "hospital_id": kiruddu.id},
     {"email": "coordinator.mbarara@rop.ug",
      "full_name": "Nurse James Tumuhairwe",
-     "password": "password123",
+     "password": "rop2024",
      "role": UserRole.HOSPITAL_COORDINATOR,
      "hospital_id": mbarara.id},
     {"email": "coordinator.gulu@rop.ug",
      "full_name": "Nurse Agnes Acen",
-     "password": "password123",
+     "password": "rop2024",
      "role": UserRole.HOSPITAL_COORDINATOR,
      "hospital_id": gulu.id},
     {"email": "coordinator.lacor@rop.ug",
      "full_name": "Nurse Mary Akello",
-     "password": "password123",
+     "password": "rop2024",
      "role": UserRole.HOSPITAL_COORDINATOR,
      "hospital_id": lacor.id},
     {"email": "coordinator.mbale@rop.ug",
      "full_name": "Nurse Christine Nabirye",
-     "password": "password123",
+     "password": "rop2024",
      "role": UserRole.HOSPITAL_COORDINATOR,
      "hospital_id": mbale.id},
 
     # Ophthalmologists
     {"email": "ophth.mulago@rop.ug",
      "full_name": "Dr. Grace Atim",
-     "password": "password123",
+     "password": "rop2024",
      "role": UserRole.OPHTHALMOLOGIST,
      "hospital_id": mulago.id},
     {"email": "ophth.mbarara@rop.ug",
      "full_name": "Dr. Robert Byarugaba",
-     "password": "password123",
+     "password": "rop2024",
      "role": UserRole.OPHTHALMOLOGIST,
      "hospital_id": mbarara.id},
 
     # NICU Nurses
     {"email": "nurse.mulago@rop.ug",
      "full_name": "Nurse Betty Auma",
-     "password": "password123",
+     "password": "rop2024",
      "role": UserRole.NICU_NURSE,
      "hospital_id": mulago.id},
     {"email": "nurse.kiruddu@rop.ug",
      "full_name": "Nurse Patricia Namutebi",
-     "password": "password123",
+     "password": "rop2024",
      "role": UserRole.NICU_NURSE,
      "hospital_id": kiruddu.id},
     {"email": "nurse.mbarara@rop.ug",
      "full_name": "Nurse Juliet Atuhaire",
-     "password": "password123",
+     "password": "rop2024",
      "role": UserRole.NICU_NURSE,
      "hospital_id": mbarara.id},
 ]
@@ -360,7 +360,7 @@ db.commit()
 print(f"Babies: {b_added} added ({len(babies_seed)} total)")
 
 print("\nSeed complete.")
-print("\nDemo logins (all passwords: password123):")
+print("\nDemo logins (all passwords: rop2024):")
 print("  central@rop.ug                  Central Coordinator")
 print("  coordinator.mulago@rop.ug       Hospital Coordinator - Mulago")
 print("  coordinator.kiruddu@rop.ug      Hospital Coordinator - Kiruddu")

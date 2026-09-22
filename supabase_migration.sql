@@ -339,6 +339,6 @@ INSERT INTO hospitals (name, district, region) VALUES
 -- NOTE: Demo users and babies are seeded via seed.py
 -- After deploying the backend, run:
 --   DATABASE_URL=<your-supabase-url> python seed.py
--- All demo accounts use password: password123
+-- All demo accounts use password: rop2024
 -- Central login: central@rop.ug
 -- ============================================================
