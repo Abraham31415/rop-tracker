@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -19,6 +19,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const passwordRef = useRef(null)
 
   // If the user was redirected here from a protected page (e.g. by scanning a
   // QR code), send them back to that page after a successful login instead of
@@ -39,7 +40,21 @@ export default function LoginPage() {
     }
   }
 
-  const fillDemo = (em) => { setEmail(em); setPassword('rop2024') }
+  const fillDemo = (em) => {
+    setEmail(em)
+    setPassword('rop2024')
+    // Some browsers/password managers silently overwrite a just-set password field
+    // with a different saved credential for that email a moment later. Re-assert the
+    // demo password shortly after so "click to fill" always wins that race.
+    // (setTimeout, not requestAnimationFrame: rAF is paused in hidden/backgrounded tabs.)
+    setTimeout(() => {
+      const input = passwordRef.current
+      if (!input || input.value === 'rop2024') return
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+      setter.call(input, 'rop2024')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    }, 60)
+  }
 
   return (
     <div className="login-page">
@@ -138,6 +153,7 @@ export default function LoginPage() {
               <label htmlFor="password">Password</label>
               <input
                 id="password"
+                ref={passwordRef}
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
